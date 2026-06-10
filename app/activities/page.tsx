@@ -109,7 +109,7 @@ export default function ActivitiesPage() {
             <div className="text-4xl mb-3">📭</div>
             <h3 className="text-lg font-bold text-gray-900 mb-1">Aucune sortie ici</h3>
             <p className="text-gray-500 text-sm">
-              Il n'y a rien à afficher dans cette catégorie pour le moment.
+              Il n&apos;y a rien à afficher dans cette catégorie pour le moment.
             </p>
           </div>
         )}

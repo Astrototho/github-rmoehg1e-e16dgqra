@@ -1,8 +1,7 @@
 'use server';
 import { MOCK_USERS } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
-import { getCurrentUser, setCurrentUser } from '@/lib/session';
-
+import { getCurrentUser } from '@/lib/session';
 import { setGlobalUser } from '@/lib/session';
 import { revalidatePath } from 'next/cache';
 
@@ -112,7 +111,7 @@ export async function getMyActivities() {
     // 3. On trie toutes ces données dans nos 4 catégories
     const myActivities = {
       // Mes sorties créées à venir
-      'mes-sorties': organizedData?.filter((a) => a.start_date >= now) || [],
+      'mes-sorties': organizedData?.filter((a) => (a as any).start_date >= now) || [],
 
       // Mes participations validées à venir
       validees:
@@ -121,7 +120,7 @@ export async function getMyActivities() {
             (p) =>
               p.status === 'approved' &&
               p.activities &&
-              p.activities.start_date >= now
+              (p.activities as any).start_date >= now
           )
           .map((p) => p.activities) || [],
 
@@ -132,19 +131,19 @@ export async function getMyActivities() {
             (p) =>
               p.status === 'pending' &&
               p.activities &&
-              p.activities.start_date >= now
+              (p.activities as any).start_date >= now
           )
           .map((p) => p.activities) || [],
 
       // L'historique (toutes mes sorties créées ou participations validées qui sont passées)
       passees: [
-        ...(organizedData?.filter((a) => a.start_date < now) || []),
+        ...(organizedData?.filter((a) => (a as any).start_date < now) || []),
         ...(participationsData
           ?.filter(
             (p) =>
               p.status === 'approved' &&
               p.activities &&
-              p.activities.start_date < now
+              (p.activities as any).start_date < now
           )
           .map((p) => p.activities) || []),
       ],

@@ -48,7 +48,7 @@ export default async function RootLayout({
 
             <div className="flex items-center gap-3">
               {/* NOTRE NOUVEAU SÉLECTEUR */}
-              <UserSwitcher currentUserId={currentUser.id} />
+              <UserSwitcher />
 
               <button className="relative p-1 hover:bg-gray-100 rounded-full transition-colors">
                 <Bell className="w-6 h-6 stroke-[1.5]" />

@@ -1,35 +1,44 @@
 import { Settings, Grid, Map, Edit3, Share } from 'lucide-react';
 import Link from 'next/link';
+import { getCurrentUser } from '@/lib/session';
+import { MOCK_USERS } from '@/lib/constants';
 
-// Fausses données de profil
-const mockUser = {
-  name: 'Thomas (Test)',
-  username: '@thomas_trail',
-  avatar: 'https://github.com/shadcn.png',
-  bio: '🏔️ Amoureux de la montagne\n🏃‍♂️ Trail & Route\n📍 Basé à Grenoble\nDispo le week-end pour des sorties longues !',
-  stats: {
-    activities: 24,
-    followers: 128,
-    following: 85,
-  },
+// Bio personnalisée par utilisateur
+const bios: Record<string, string> = {
+  'user_strava_mock_123': '🏔️ Amoureux de la montagne\n🏃‍♂️ Trail & Route\n📍 Basé à Grenoble\nDispo le week-end pour des sorties longues !',
+  'conv-1': '🚴 Passionnée de vélo route\n💪 Toujours en quête de nouveaux défis\n📍 Lyon\nLet\'s ride together !',
+  'conv-2': '⛰️ VTT addict\n🌲 Amoureux de la nature\n📍 Chamonix\nWeekends d\'aventure garantis !',
 };
 
-// Fausses photos pour la grille (type Instagram)
+// Stats personnalisées
+const stats: Record<string, { activities: number; followers: number; following: number }> = {
+  'user_strava_mock_123': { activities: 24, followers: 128, following: 85 },
+  'conv-1': { activities: 42, followers: 256, following: 143 },
+  'conv-2': { activities: 18, followers: 89, following: 112 },
+};
+
 const mockGridPhotos = [
-  'https://images.unsplash.com/photo-1551632811-561732d1e306?q=80&w=400&auto=format&fit=crop', // Trail
-  'https://images.unsplash.com/photo-1541625602330-2277a4c4618c?q=80&w=400&auto=format&fit=crop', // Velo
-  'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=400&auto=format&fit=crop', // Paysage
-  'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop', // Sommet
-  'https://images.unsplash.com/photo-1502224562085-639556652f33?q=80&w=400&auto=format&fit=crop', // Course route
-  'https://images.unsplash.com/photo-1511994298241-608e28f14fde?q=80&w=400&auto=format&fit=crop', // VTT
+  'https://images.unsplash.com/photo-1551632811-561732d1e306?q=80&w=400&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1541625602330-2277a4c4618c?q=80&w=400&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=400&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1502224562085-639556652f33?q=80&w=400&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1511994298241-608e28f14fde?q=80&w=400&auto=format&fit=crop',
 ];
 
-export default function ProfilePage() {
+export const dynamic = 'force-dynamic';
+
+export default async function ProfilePage() {
+  const currentUser = await getCurrentUser();
+  
+  const userBio = bios[currentUser.id] || bios['user_strava_mock_123'];
+  const userStats = stats[currentUser.id] || stats['user_strava_mock_123'];
+
   return (
     <div className="flex flex-col h-full bg-white">
       {/* En-tête (Top Bar) */}
       <header className="px-4 h-14 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur-md z-40">
-        <h1 className="text-xl font-bold text-gray-900">{mockUser.username}</h1>
+        <h1 className="text-xl font-bold text-gray-900">@{currentUser.name.toLowerCase().replace(/\s/g, '_')}</h1>
         <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
           <Settings className="w-6 h-6 text-gray-900" />
         </button>
@@ -42,78 +51,67 @@ export default function ProfilePage() {
             {/* Avatar */}
             <div className="relative">
               <img
-                src={mockUser.avatar}
-                alt={mockUser.name}
+                src={currentUser.avatar}
+                alt={currentUser.name}
                 className="w-20 h-20 rounded-full object-cover border-2 border-gray-100"
               />
             </div>
 
-            {/* Stats (Sorties, Abonnés, Abonnements) */}
-            <div className="flex gap-6 mr-2 text-center">
-              <div className="flex flex-col items-center">
-                <span className="font-bold text-lg text-gray-900">
-                  {mockUser.stats.activities}
-                </span>
-                <span className="text-xs text-gray-500">Sorties</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="font-bold text-lg text-gray-900">
-                  {mockUser.stats.followers}
-                </span>
-                <span className="text-xs text-gray-500">Abonnés</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="font-bold text-lg text-gray-900">
-                  {mockUser.stats.following}
-                </span>
-                <span className="text-xs text-gray-500">Suivis</span>
-              </div>
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+                Suivre
+              </button>
+              <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                <Share className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+          </div>
+
+          {/* Nom & Username */}
+          <div className="mb-3">
+            <h2 className="text-xl font-bold text-gray-900">{currentUser.name}</h2>
+          </div>
+
+          {/* Stats */}
+          <div className="flex gap-6 mb-4 text-center">
+            <div>
+              <p className="text-lg font-bold text-gray-900">{userStats.activities}</p>
+              <p className="text-xs text-gray-500">Sorties</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-gray-900">{userStats.followers}</p>
+              <p className="text-xs text-gray-500">Suiveurs</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-gray-900">{userStats.following}</p>
+              <p className="text-xs text-gray-500">J'aime</p>
             </div>
           </div>
 
           {/* Bio */}
-          <div className="mb-4">
-            <h2 className="font-bold text-gray-900">{mockUser.name}</h2>
-            <p className="text-sm text-gray-700 whitespace-pre-line mt-1">
-              {mockUser.bio}
-            </p>
-          </div>
+          <p className="text-sm text-gray-700 whitespace-pre-line">{userBio}</p>
+        </div>
 
-          {/* Boutons d'action */}
-          <div className="flex gap-2">
-            <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
-              <Edit3 className="w-4 h-4" /> Modifier
+        {/* Navigation Tabs */}
+        <div className="sticky top-14 bg-white border-b border-gray-100 z-30">
+          <div className="flex gap-6 px-4 text-sm font-medium">
+            <button className="py-3 text-primary border-b-2 border-primary flex items-center gap-1.5">
+              <Grid className="w-4 h-4" />
+              Grille
             </button>
-            <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
-              <Share className="w-4 h-4" /> Partager
+            <button className="py-3 text-gray-600 border-b-2 border-transparent hover:text-gray-900 flex items-center gap-1.5">
+              <Map className="w-4 h-4" />
+              Carte
             </button>
           </div>
         </div>
 
-        {/* Séparateur / Onglets type Instagram */}
-        <div className="flex border-t border-gray-100 mt-2">
-          <div className="flex-1 border-t-2 border-gray-900 flex justify-center py-3">
-            <Grid className="w-6 h-6 text-gray-900" />
-          </div>
-          <div className="flex-1 flex justify-center py-3">
-            <Map className="w-6 h-6 text-gray-400" />
-          </div>
-        </div>
-
-        {/* Grille de photos (3 colonnes) */}
-        <div className="grid grid-cols-3 gap-1">
-          {mockGridPhotos.map((photo, index) => (
-            <div
-              key={index}
-              className="aspect-square bg-gray-200 relative group cursor-pointer"
-            >
-              <img
-                src={photo}
-                alt={`Post ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
-              {/* Effet au survol (optionnel, plus sympa sur desktop) */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+        {/* Photo Grid */}
+        <div className="grid grid-cols-3 gap-1 p-0">
+          {mockGridPhotos.map((photo, idx) => (
+            <div key={idx} className="relative aspect-square overflow-hidden bg-gray-100">
+              <img src={photo} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover hover:opacity-90 transition-opacity cursor-pointer" />
             </div>
           ))}
         </div>
