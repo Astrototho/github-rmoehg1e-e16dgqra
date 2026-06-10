@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { MapPin, Calendar, TrendingUp, Users } from 'lucide-react';
 
 // 1. On met à jour l'interface pour coller EXACTEMENT à Supabase
@@ -23,12 +24,14 @@ export interface Activity {
 // 2. Props du composant
 interface ActivityCardProps {
   activity: Activity;
+  href?: string;
   onClick?: () => void;
   hasStatusBadge?: boolean;
 }
 
 export default function ActivityCard({
   activity,
+  href,
   onClick,
   hasStatusBadge = false,
 }: ActivityCardProps) {
@@ -62,11 +65,11 @@ export default function ActivityCard({
     .toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
     .replace(':', 'h');
 
-  return (
-    <button
-      onClick={onClick}
-      className="w-full bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-200 text-left"
-    >
+  const cardClassName =
+    'block w-full bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-200 text-left';
+
+  const cardContent = (
+    <>
       {/* Map Background */}
       <div className="relative h-40 overflow-hidden bg-slate-100">
         {activity.routeImage && (
@@ -164,6 +167,20 @@ export default function ActivityCard({
           </p>
         )}
       </div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={cardClassName}>
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return (
+    <button onClick={onClick} className={cardClassName}>
+      {cardContent}
     </button>
   );
 }

@@ -1,24 +1,45 @@
-import { MOCK_USERS } from './constants';
-import { cookies } from 'next/headers';
+import { auth } from '@/auth';
+import { createAdminClient } from '@/lib/supabase-admin';
+import type { AppUser, Profile } from '@/lib/types';
 
-export async function getCurrentUser() {
-  try {
-    // 1. Essaye de lire depuis les cookies (défini par le client)
-    const cookieStore = await cookies();
-    const userId = cookieStore.get('currentUserId')?.value;
-    
-    if (userId && MOCK_USERS.find(u => u.id === userId)) {
-      return MOCK_USERS.find(u => u.id === userId)!;
-    }
-  } catch (e) {
-    // Cookies not available (edge case)
-  }
-  
-  // 2. Fallback à l'utilisateur par défaut
-  return MOCK_USERS[0];
+function mapProfileToAppUser(profile: Profile): AppUser {
+  return {
+    id: profile.id,
+    name: profile.name,
+    avatar: profile.avatar_url ?? '/default-avatar.png',
+    bio: profile.bio ?? undefined,
+    strava_username: profile.strava_username ?? undefined,
+  };
 }
 
-export function setGlobalUser(userId: string) {
-  // Deprecated - kept for backward compatibility
-  // Use client-side localStorage + cookies instead
+export async function getCurrentUser(): Promise<AppUser | null> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('profiles')
+    .select('*')
+    .eq('id', session.user.id)
+    .single();
+
+  if (error || !data) {
+    return {
+      id: session.user.id,
+      name: session.user.name ?? 'Athlète',
+      avatar: session.user.image ?? '/default-avatar.png',
+    };
+  }
+
+  return mapProfileToAppUser(data as Profile);
+}
+
+export async function requireAuth(): Promise<AppUser> {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error('Non authentifié');
+  }
+  return user;
 }
