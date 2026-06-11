@@ -102,11 +102,7 @@ export default function ActivitiesPage() {
       <div className="p-4 space-y-4 flex-1 overflow-y-auto">
         {currentActivities && currentActivities.length > 0 ? (
           currentActivities.map((activity) => (
-            <ActivityCard
-              key={activity.id}
-              activity={activity}
-              href={`/activities/${activity.id}`}
-            />
+            <ActivityCard key={activity.id} activity={activity} />
           ))
         ) : (
           <div className="text-center py-12">

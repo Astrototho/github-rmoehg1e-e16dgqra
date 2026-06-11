@@ -12,7 +12,8 @@ import {
   Menu as MenuIcon,
 } from 'lucide-react';
 
-import AuthButton from '@/components/AuthButton';
+import { getCurrentUser } from '@/lib/session';
+import UserSwitcher from '@/components/UserSwitcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,9 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Layout shell — auth state shown in header via AuthButton
+  // On récupère l'utilisateur actif
+  const currentUser = await getCurrentUser();
+
   return (
     <html lang="fr">
       <body className={`${inter.className} bg-gray-50 text-slate-900`}>
@@ -44,7 +47,8 @@ export default async function RootLayout({
             </Link>
 
             <div className="flex items-center gap-3">
-              <AuthButton />
+              {/* NOTRE NOUVEAU SÉLECTEUR */}
+              <UserSwitcher />
 
               <button className="relative p-1 hover:bg-gray-100 rounded-full transition-colors">
                 <Bell className="w-6 h-6 stroke-[1.5]" />
