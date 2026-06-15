@@ -12,8 +12,7 @@ import {
   Menu as MenuIcon,
 } from 'lucide-react';
 
-import { getCurrentUser } from '@/lib/session';
-import UserSwitcher from '@/components/UserSwitcher';
+import { getNavBadgesAction } from '@/app/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,8 +28,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // On récupère l'utilisateur actif
-  const currentUser = await getCurrentUser();
+  const { unreadMessages, unreadNotifications } = await getNavBadgesAction();
 
   return (
     <html lang="fr">
@@ -47,14 +45,17 @@ export default async function RootLayout({
             </Link>
 
             <div className="flex items-center gap-3">
-              {/* NOTRE NOUVEAU SÉLECTEUR */}
-              <UserSwitcher />
-
-              <button className="relative p-1 hover:bg-gray-100 rounded-full transition-colors">
+              <Link
+                href="/notifications"
+                className="relative p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
                 <Bell className="w-6 h-6 stroke-[1.5]" />
-                {/* Petit point rouge de notification gardé depuis ton 2ème code */}
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-              </button>
+                {unreadNotifications > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center text-[10px] font-bold leading-none text-white bg-red-500 rounded-full border-2 border-white">
+                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  </span>
+                )}
+              </Link>
 
               <button className="p-1 hover:bg-gray-100 rounded-full transition-colors">
                 <MenuIcon className="w-6 h-6 stroke-[1.5]" />
@@ -94,9 +95,14 @@ export default async function RootLayout({
 
             <Link
               href="/messages"
-              className="flex flex-col items-center gap-1 group"
+              className="relative flex flex-col items-center gap-1 group"
             >
               <MessageCircle className="w-6 h-6 stroke-[1.5] group-hover:text-primary transition-colors" />
+              {unreadMessages > 0 && (
+                <span className="absolute -top-1 right-2 min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center text-[10px] font-bold leading-none text-white bg-red-500 rounded-full border-2 border-white">
+                  {unreadMessages > 9 ? '9+' : unreadMessages}
+                </span>
+              )}
               <span className="text-[10px] font-bold uppercase tracking-tighter">
                 Messages
               </span>

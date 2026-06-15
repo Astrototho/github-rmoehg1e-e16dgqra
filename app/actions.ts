@@ -5,6 +5,17 @@ import { ACTIVITY_COLUMNS } from '@/lib/activities';
 import { getCurrentUser, requireAuth } from '@/lib/session';
 import { revalidatePath } from 'next/cache';
 import { getUserAvatar, getUserName, getUsersByIds } from '@/lib/users';
+import {
+  createNotification,
+  getNotificationsForUser,
+  getUnreadNotificationCount,
+  markResponseNotificationsAsRead,
+  markNotificationsByRelatedId,
+} from '@/lib/notifications';
+import {
+  getUnreadConversationsCount,
+  markConversationAsRead,
+} from '@/lib/messages';
 import type {
   Activity,
   ConversationPreview,
@@ -200,6 +211,11 @@ export async function getConversation(contactId: string) {
       .order('created_at', { ascending: true });
 
     if (error) throw error;
+
+    await markConversationAsRead(currentUser.id, contactId);
+    // Rafraîchit le badge "Messages" de la barre de navigation (layout racine).
+    revalidatePath('/', 'layout');
+
     return { success: true, data };
   } catch (err) {
     console.error('Erreur getConversation:', err);
@@ -223,6 +239,7 @@ export async function sendMessage(receiverId: string, content: string) {
     ]);
 
     if (error) throw error;
+
     return { success: true };
   } catch (err) {
     console.error('Erreur sendMessage:', err);
@@ -291,6 +308,24 @@ export async function getMyParticipationForActivity(activityId: string) {
   }
 }
 
+// Notifie l'organisateur qu'un utilisateur demande à rejoindre sa sortie.
+// La notification (type participation_request) s'affiche sur la cloche et
+// disparaît dès que l'organisateur accepte ou refuse (cf. related_id).
+async function notifyOrganizerOfRequest(
+  activity: Activity,
+  requesterName: string,
+  participationId: string
+) {
+  await createNotification({
+    userId: activity.organizer_id,
+    type: 'participation_request',
+    title: 'Nouvelle demande de participation',
+    body: `${requesterName} souhaite participer à "${activity.title}".`,
+    link: `/activities/${activity.id}`,
+    relatedId: participationId,
+  });
+}
+
 export async function requestParticipation(activityId: string) {
   try {
     const currentUser = await getCurrentUser();
@@ -322,24 +357,43 @@ export async function requestParticipation(activityId: string) {
           .update({ status: 'pending' })
           .eq('id', existing.data.id);
         if (error) throw error;
+
+        await notifyOrganizerOfRequest(
+          activityResult.data,
+          currentUser.name,
+          existing.data.id
+        );
+
         revalidatePath(`/activities/${activityId}`);
         revalidatePath('/activities');
+        revalidatePath('/', 'layout');
         return { success: true };
       }
     }
 
-    const { error } = await admin().from('participations').insert([
-      {
-        user_id: currentUser.id,
-        activity_id: activityId,
-        status: 'pending',
-      },
-    ]);
+    const { data: inserted, error } = await admin()
+      .from('participations')
+      .insert([
+        {
+          user_id: currentUser.id,
+          activity_id: activityId,
+          status: 'pending',
+        },
+      ])
+      .select('id')
+      .single();
 
     if (error) throw error;
 
+    await notifyOrganizerOfRequest(
+      activityResult.data,
+      currentUser.name,
+      inserted.id
+    );
+
     revalidatePath(`/activities/${activityId}`);
     revalidatePath('/activities');
+    revalidatePath('/', 'layout');
     return { success: true };
   } catch (err) {
     console.error('Erreur requestParticipation:', err);
@@ -356,7 +410,7 @@ export async function updateParticipationStatus(
 
     const { data: participation, error: fetchError } = await admin()
       .from('participations')
-      .select('*, activities(organizer_id)')
+      .select('*, activities(organizer_id, title)')
       .eq('id', participationId)
       .single();
 
@@ -364,9 +418,12 @@ export async function updateParticipationStatus(
       return { success: false, error: 'Demande introuvable.' };
     }
 
-    const organizerId = (participation.activities as { organizer_id: string })
-      ?.organizer_id;
-    if (organizerId !== currentUser.id) {
+    const activityInfo = participation.activities as {
+      organizer_id: string;
+      title: string;
+    };
+
+    if (activityInfo?.organizer_id !== currentUser.id) {
       return { success: false, error: 'Action non autorisée.' };
     }
 
@@ -377,8 +434,24 @@ export async function updateParticipationStatus(
 
     if (error) throw error;
 
+    // La demande d'acceptation a été traitée : on retire la notification
+    // "participation_request" de la cloche de l'organisateur.
+    await markNotificationsByRelatedId(participationId);
+
+    await createNotification({
+      userId: participation.user_id,
+      type: status === 'approved' ? 'participation_approved' : 'participation_rejected',
+      title: status === 'approved' ? 'Demande acceptée' : 'Demande refusée',
+      body:
+        status === 'approved'
+          ? `Ta demande pour participer à "${activityInfo.title}" a été acceptée !`
+          : `Ta demande pour participer à "${activityInfo.title}" a été refusée.`,
+      link: `/activities/${participation.activity_id}`,
+    });
+
     revalidatePath(`/activities/${participation.activity_id}`);
     revalidatePath('/activities');
+    revalidatePath('/', 'layout');
     return { success: true };
   } catch (err) {
     console.error('Erreur updateParticipationStatus:', err);
@@ -488,4 +561,52 @@ export async function getContactProfileAction(contactId: string) {
         'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=100',
     },
   };
+}
+
+export async function getNotifications() {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return authError();
+
+    const data = await getNotificationsForUser(currentUser.id);
+    return { success: true, data };
+  } catch (err) {
+    console.error('Erreur getNotifications:', err);
+    return { success: false, error: 'Impossible de charger les notifications.' };
+  }
+}
+
+export async function getNavBadgesAction() {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    return { unreadMessages: 0, unreadNotifications: 0 };
+  }
+
+  // La cloche regroupe désormais les demandes d'acceptation de sortie ET les
+  // réponses (participation validée / refusée) : ce sont toutes des lignes
+  // non lues de la table notifications.
+  const [unreadMessages, unreadNotifications] = await Promise.all([
+    getUnreadConversationsCount(currentUser.id),
+    getUnreadNotificationCount(currentUser.id),
+  ]);
+
+  return { unreadMessages, unreadNotifications };
+}
+
+// Appelé à l'ouverture de la page Notifications : les réponses à une demande de
+// participation (acceptée / refusée) disparaissent de la cloche. Les demandes
+// d'acceptation de sortie restent, elles, jusqu'à ce qu'on accepte ou refuse.
+// (Marquage seul, sans revalidate : appelé pendant le rendu de la page.)
+export async function getNotificationsAndMarkResponsesRead() {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return authError();
+
+    const data = await getNotificationsForUser(currentUser.id);
+    await markResponseNotificationsAsRead(currentUser.id);
+    return { success: true, data };
+  } catch (err) {
+    console.error('Erreur getNotificationsAndMarkResponsesRead:', err);
+    return { success: false, error: 'Impossible de charger les notifications.' };
+  }
 }

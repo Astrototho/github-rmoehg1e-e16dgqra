@@ -28,3 +28,23 @@ export async function getActivityByIdFromDb(id: string): Promise<Activity | null
   if (error || !data) return null;
   return data as Activity;
 }
+
+export async function getPendingParticipationRequestsCount(
+  organizerId: string
+): Promise<number> {
+  const { count, error } = await createAdminClient()
+    .from('participations')
+    .select('id, activities!inner(organizer_id)', {
+      count: 'exact',
+      head: true,
+    })
+    .eq('status', 'pending')
+    .eq('activities.organizer_id', organizerId);
+
+  if (error) {
+    console.error('Erreur getPendingParticipationRequestsCount:', error);
+    return 0;
+  }
+
+  return count ?? 0;
+}

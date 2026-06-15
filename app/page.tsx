@@ -1,6 +1,7 @@
 import ActivityCard from '@/components/ActivityCard';
 import { getApprovedParticipantsForActivities } from '@/app/actions';
 import { getAllActivities } from '@/lib/activities';
+import { getCurrentUser } from '@/lib/session';
 import { unstable_noStore as noStore } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,12 @@ export const dynamic = 'force-dynamic';
 export default async function Home() {
   noStore();
 
-  const activities = await getAllActivities();
+  const currentUser = await getCurrentUser();
+  const allActivities = await getAllActivities();
+  // Sur le fil, on ne montre pas les sorties que l'on organise soi-même.
+  const activities = currentUser
+    ? allActivities.filter((a) => a.organizer_id !== currentUser.id)
+    : allActivities;
   const activityIds = activities.map((a) => a.id);
   const participantsMap =
     await getApprovedParticipantsForActivities(activityIds);
