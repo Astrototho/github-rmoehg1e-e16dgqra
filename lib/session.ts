@@ -2,11 +2,14 @@ import { auth } from '@/auth';
 import { createAdminClient } from '@/lib/supabase-admin';
 import type { AppUser, Profile } from '@/lib/types';
 
+const DEFAULT_AVATAR =
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=100';
+
 function mapProfileToAppUser(profile: Profile): AppUser {
   return {
     id: profile.id,
     name: profile.name,
-    avatar: profile.avatar_url ?? '/default-avatar.png',
+    avatar: profile.avatar_url ?? DEFAULT_AVATAR,
     bio: profile.bio ?? undefined,
     strava_username: profile.strava_username ?? undefined,
   };
@@ -29,7 +32,7 @@ export async function getCurrentUser(): Promise<AppUser | null> {
     return {
       id: session.user.id,
       name: session.user.name ?? 'Athlète',
-      avatar: session.user.image ?? '/default-avatar.png',
+      avatar: session.user.image ?? DEFAULT_AVATAR,
     };
   }
 

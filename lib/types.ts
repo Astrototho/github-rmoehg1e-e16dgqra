@@ -19,6 +19,13 @@ export interface AppUser {
   strava_username?: string;
 }
 
+export type ActivityType =
+  | 'trail'
+  | 'course-a-pied'
+  | 'velo-route'
+  | 'velo'
+  | 'vtt';
+
 export interface Activity {
   id: string;
   title: string;
@@ -44,6 +51,16 @@ export interface Participation {
 export interface ParticipationWithUser extends Participation {
   user_name: string;
   user_avatar: string;
+}
+
+export interface Message {
+  id: string;
+  created_at: string;
+  sender_id: string;
+  sender_name: string;
+  sender_avatar: string;
+  receiver_id: string;
+  content: string;
 }
 
 export interface ConversationPreview {

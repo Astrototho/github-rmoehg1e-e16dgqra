@@ -1,5 +1,8 @@
 import ActivityCard from '@/components/ActivityCard';
-import { getApprovedParticipantsForActivities } from '@/app/actions';
+import {
+  getApprovedParticipantsForActivities,
+  getMatchPercentagesForActivities,
+} from '@/app/actions';
 import { getAllActivities } from '@/lib/activities';
 import { getCurrentUser } from '@/lib/session';
 import { unstable_noStore as noStore } from 'next/cache';
@@ -16,8 +19,10 @@ export default async function Home() {
     ? allActivities.filter((a) => a.organizer_id !== currentUser.id)
     : allActivities;
   const activityIds = activities.map((a) => a.id);
-  const participantsMap =
-    await getApprovedParticipantsForActivities(activityIds);
+  const [participantsMap, matchMap] = await Promise.all([
+    getApprovedParticipantsForActivities(activityIds),
+    getMatchPercentagesForActivities(activities),
+  ]);
 
   return (
     <div className="space-y-6 p-4">
@@ -38,6 +43,7 @@ export default async function Home() {
             activity={{
               ...act,
               participants: participantsMap[act.id] ?? [],
+              matchPercentage: matchMap[act.id],
             }}
             href={`/activities/${act.id}`}
           />

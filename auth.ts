@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import Strava from 'next-auth/providers/strava';
 import { createAdminClient } from '@/lib/supabase-admin';
+import { refreshPerformanceProfile } from '@/lib/performance';
 
 interface StravaAthleteProfile {
   id?: number;
@@ -20,7 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientSecret: process.env.AUTH_STRAVA_SECRET,
       authorization: {
         params: {
-          scope: 'read,profile:read_all',
+          scope: 'read,profile:read_all,activity:read_all',
         },
       },
     }),
@@ -62,6 +63,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (error) {
         console.error('Erreur sync profil Strava → Supabase:', error);
         return false;
+      }
+
+      // Capture des tokens + calcul du profil de performance : une erreur
+      // ici ne doit jamais bloquer la connexion, c'est une amélioration,
+      // pas une exigence d'authentification.
+      if (account.access_token && account.refresh_token && account.expires_at) {
+        const { error: tokenError } = await admin.from('strava_tokens').upsert(
+          {
+            user_id: account.providerAccountId,
+            access_token: account.access_token,
+            refresh_token: account.refresh_token,
+            expires_at: new Date(account.expires_at * 1000).toISOString(),
+            scope: account.scope ?? null,
+          },
+          { onConflict: 'user_id' }
+        );
+
+        if (tokenError) {
+          console.error('Erreur sync tokens Strava:', tokenError);
+        } else {
+          try {
+            await refreshPerformanceProfile(
+              account.providerAccountId,
+              account.access_token
+            );
+          } catch (err) {
+            console.error('Erreur refreshPerformanceProfile (login):', err);
+          }
+        }
       }
 
       return true;

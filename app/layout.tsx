@@ -9,10 +9,10 @@ import {
   MessageCircle,
   User,
   Bell,
-  Menu as MenuIcon,
 } from 'lucide-react';
 
 import { getNavBadgesAction } from '@/app/actions';
+import HeaderMenu from '@/components/HeaderMenu';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,11 +37,8 @@ export default async function RootLayout({
         <div className="flex flex-col min-h-screen max-w-md mx-auto bg-white shadow-2xl relative">
           {/* --- BARRE SUPÉRIEURE (Top Nav) --- */}
           <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b px-4 h-14 flex items-center justify-between">
-            <Link
-              href="/"
-              className="text-xl font-black italic tracking-tighter text-primary"
-            >
-              PERFCONNECT
+            <Link href="/" className="flex items-center">
+              <img src="/logo.png" alt="PerfConnect" className="h-7 w-auto" />
             </Link>
 
             <div className="flex items-center gap-3">
@@ -57,9 +54,7 @@ export default async function RootLayout({
                 )}
               </Link>
 
-              <button className="p-1 hover:bg-gray-100 rounded-full transition-colors">
-                <MenuIcon className="w-6 h-6 stroke-[1.5]" />
-              </button>
+              <HeaderMenu />
             </div>
           </header>
 

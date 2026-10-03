@@ -3,8 +3,11 @@
 import { createAdminClient } from '@/lib/supabase-admin';
 import { ACTIVITY_COLUMNS } from '@/lib/activities';
 import { getCurrentUser, requireAuth } from '@/lib/session';
+import { signOut } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { getUserAvatar, getUserName, getUsersByIds } from '@/lib/users';
+import { getPerformanceProfilesForUsers } from '@/lib/performance';
+import { computeMatchPercentage } from '@/lib/matching';
 import {
   createNotification,
   getNotificationsForUser,
@@ -18,6 +21,7 @@ import {
 } from '@/lib/messages';
 import type {
   Activity,
+  ActivityType,
   ConversationPreview,
   Participation,
   ParticipationWithUser,
@@ -81,6 +85,13 @@ export async function createActivity(formData: FormData) {
       return {
         success: false,
         error: "Le format de la date ou de l'heure est invalide.",
+      };
+    }
+
+    if (dateObj.getTime() < Date.now()) {
+      return {
+        success: false,
+        error: 'La date de la sortie doit être dans le futur.',
       };
     }
 
@@ -487,6 +498,56 @@ export async function getApprovedParticipantsForActivities(
     console.error('Erreur getApprovedParticipantsForActivities:', err);
     return {};
   }
+}
+
+export async function getMatchPercentagesForActivities(
+  activities: Pick<Activity, 'id' | 'organizer_id' | 'type'>[]
+): Promise<Record<string, number>> {
+  try {
+    const viewer = await getCurrentUser();
+    if (!viewer) return {};
+
+    const organizerIds = Array.from(
+      new Set(activities.map((a) => a.organizer_id))
+    );
+    const allUserIds = Array.from(new Set([viewer.id, ...organizerIds]));
+
+    const [profilesByUser, geoProfiles] = await Promise.all([
+      getPerformanceProfilesForUsers(allUserIds),
+      getUsersByIds(allUserIds),
+    ]);
+
+    const geoMap = new Map(geoProfiles.map((p) => [p.id, p]));
+    const viewerGeo = geoMap.get(viewer.id) ?? {};
+    const viewerFamilies = new Map(
+      (profilesByUser[viewer.id] ?? []).map((p) => [p.sportFamily, p])
+    );
+
+    const map: Record<string, number> = {};
+    for (const act of activities) {
+      if (act.organizer_id === viewer.id) continue;
+
+      const organizerFamilies = new Map(
+        (profilesByUser[act.organizer_id] ?? []).map((p) => [p.sportFamily, p])
+      );
+      const pct = computeMatchPercentage(
+        viewerFamilies.get(act.type as ActivityType),
+        organizerFamilies.get(act.type as ActivityType),
+        viewerGeo,
+        geoMap.get(act.organizer_id) ?? {}
+      );
+      if (pct !== null) map[act.id] = pct;
+    }
+
+    return map;
+  } catch (err) {
+    console.error('Erreur getMatchPercentagesForActivities:', err);
+    return {};
+  }
+}
+
+export async function signOutAction() {
+  await signOut({ redirectTo: '/' });
 }
 
 export async function getCurrentUserAction() {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'; // <-- Ajout de useRouter
 import { X, MapPin, Calendar, TrendingUp } from 'lucide-react';
 import { createActivity } from '@/app/actions';
 
-type SportType = 'trail' | 'course-a-pied' | 'velo-route' | 'vtt';
+type SportType = 'trail' | 'course-a-pied' | 'velo-route' | 'velo' | 'vtt';
 
 interface PropositionFormProps {
   onClose?: () => void;
@@ -15,6 +15,7 @@ export default function PropositionForm({ onClose }: PropositionFormProps) {
   const [sport, setSport] = useState<SportType>('trail');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const today = new Date().toISOString().split('T')[0];
 
   // Initialisation du router
   const router = useRouter();
@@ -77,7 +78,7 @@ export default function PropositionForm({ onClose }: PropositionFormProps) {
           <label className="block text-sm font-medium text-gray-700 mb-3">
             Type de sortie
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
               onClick={() => setSport('trail')}
@@ -116,6 +117,18 @@ export default function PropositionForm({ onClose }: PropositionFormProps) {
             </button>
             <button
               type="button"
+              onClick={() => setSport('velo')}
+              className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
+                sport === 'velo'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-gray-100 bg-white hover:border-gray-200'
+              }`}
+            >
+              <div className="text-2xl mb-1">🚴</div>
+              <div className="text-sm font-medium">Vélo</div>
+            </button>
+            <button
+              type="button"
               onClick={() => setSport('vtt')}
               className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
                 sport === 'vtt'
@@ -139,6 +152,7 @@ export default function PropositionForm({ onClose }: PropositionFormProps) {
               type="date"
               name="date"
               required
+              min={today}
               className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
             />
           </div>

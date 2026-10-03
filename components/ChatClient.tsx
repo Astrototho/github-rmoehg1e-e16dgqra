@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Send } from 'lucide-react';
 import { getConversation, sendMessage } from '@/app/actions';
+import type { Message } from '@/lib/types';
 
 interface ChatClientProps {
   contactId: string;
@@ -18,7 +19,7 @@ export default function ChatClient({
   contactAvatar,
   currentUserId,
 }: ChatClientProps) {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
