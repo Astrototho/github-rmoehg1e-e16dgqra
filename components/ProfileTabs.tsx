@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { List, Map } from 'lucide-react';
-import CityPicker from '@/components/CityPicker';
 
 interface ProfileActivity {
   id: string;
@@ -30,16 +29,12 @@ const sportEmojis: Record<string, string> = {
 
 export default function ProfileTabs({
   activities,
-  city: initialCity,
-  country: initialCountry,
-  latitude: initialLatitude,
-  longitude: initialLongitude,
+  city,
+  country,
+  latitude,
+  longitude,
 }: ProfileTabsProps) {
   const [tab, setTab] = useState<'sorties' | 'carte'>('sorties');
-  const [city, setCity] = useState(initialCity);
-  const [country, setCountry] = useState(initialCountry);
-  const [latitude, setLatitude] = useState(initialLatitude);
-  const [longitude, setLongitude] = useState(initialLongitude);
 
   const mapQuery =
     latitude != null && longitude != null
@@ -107,18 +102,7 @@ export default function ProfileTabs({
           </div>
         )
       ) : (
-        <div className="p-4 space-y-3">
-          <CityPicker
-            currentCity={city}
-            currentCountry={country}
-            onSelected={(params) => {
-              setCity(params.city);
-              setCountry(params.country);
-              setLatitude(params.latitude);
-              setLongitude(params.longitude);
-            }}
-          />
-
+        <div className="p-4">
           {mapQuery ? (
             <div className="aspect-square w-full rounded-xl overflow-hidden border border-gray-100">
               <iframe
@@ -130,9 +114,12 @@ export default function ProfileTabs({
             </div>
           ) : (
             <div className="text-center py-16 px-4">
-              <p className="text-gray-400 text-sm">
-                Renseigne ta ville ci-dessus pour voir la carte.
+              <p className="text-gray-400 text-sm mb-2">
+                Aucune ville renseignée pour le moment.
               </p>
+              <Link href="/settings" className="text-primary text-sm font-semibold hover:underline">
+                Renseigne-la dans Paramètres
+              </Link>
             </div>
           )}
         </div>

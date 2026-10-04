@@ -38,6 +38,13 @@ export default function LoginPage() {
       >
         Continuer sans connexion
       </Link>
+
+      <Link
+        href="/legal"
+        className="mt-3 text-xs text-gray-400 hover:text-gray-600 underline transition-colors"
+      >
+        Politique de confidentialité
+      </Link>
     </div>
   );
 }

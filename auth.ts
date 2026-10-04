@@ -111,7 +111,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     authorized({ auth, request: { nextUrl } }) {
       const path = nextUrl.pathname;
 
-      if (path.startsWith('/api/auth') || path === '/login') {
+      if (
+        path.startsWith('/api/auth') ||
+        path === '/login' ||
+        path.startsWith('/legal')
+      ) {
         return true;
       }
 

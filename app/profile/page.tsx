@@ -1,9 +1,6 @@
-import { Zap } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
 import { createAdminClient } from '@/lib/supabase-admin';
-import { hasActivityScopeConnected } from '@/lib/performance';
-import { signIn } from '@/auth';
 import ProfileTabs from '@/components/ProfileTabs';
 import ShareInviteButton from '@/components/ShareInviteButton';
 
@@ -16,8 +13,6 @@ export default async function ProfilePage() {
   }
 
   const admin = createAdminClient();
-
-  const stravaConnected = await hasActivityScopeConnected(currentUser.id);
 
   const { count: organizedCount } = await admin
     .from('activities')
@@ -77,24 +72,6 @@ export default async function ProfilePage() {
             <p className="text-sm text-gray-700 whitespace-pre-line">
               {currentUser.bio}
             </p>
-          )}
-
-          {!stravaConnected && (
-            <form
-              action={async () => {
-                'use server';
-                await signIn('strava', { redirectTo: '/profile' });
-              }}
-              className="mt-4"
-            >
-              <button
-                type="submit"
-                className="w-full flex items-center justify-center gap-2 bg-primary/10 text-primary font-semibold py-3 rounded-xl hover:bg-primary/20 transition-colors text-sm"
-              >
-                <Zap className="w-4 h-4" />
-                Reconnecter Strava pour activer le matching
-              </button>
-            </form>
           )}
         </div>
 

@@ -9,6 +9,7 @@ import {
   MessageCircle,
   User,
   Bell,
+  Settings,
 } from 'lucide-react';
 
 import { getNavBadgesAction } from '@/app/actions';
@@ -52,6 +53,13 @@ export default async function RootLayout({
                     {unreadNotifications > 9 ? '9+' : unreadNotifications}
                   </span>
                 )}
+              </Link>
+
+              <Link
+                href="/settings"
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <Settings className="w-6 h-6 stroke-[1.5]" />
               </Link>
 
               <HeaderMenu />

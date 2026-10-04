@@ -588,6 +588,26 @@ export async function signOutAction() {
   await signOut({ redirectTo: '/' });
 }
 
+export async function deleteAccountAction() {
+  let currentUser;
+  try {
+    currentUser = await requireAuth();
+  } catch {
+    return { success: false, error: 'Non authentifié.' };
+  }
+
+  const { error } = await admin().from('profiles').delete().eq('id', currentUser.id);
+  if (error) {
+    console.error('Erreur deleteAccountAction:', error);
+    return { success: false, error: 'Impossible de supprimer ton compte.' };
+  }
+
+  // Les activites, participations, messages, notifications, tokens Strava et
+  // profils de performance de l'utilisateur sont supprimes en cascade par
+  // les contraintes de cle etrangere definies dans les migrations.
+  await signOut({ redirectTo: '/' });
+}
+
 export async function getCurrentUserAction() {
   const user = await getCurrentUser();
   if (!user) return { success: false, error: 'Non authentifié' };

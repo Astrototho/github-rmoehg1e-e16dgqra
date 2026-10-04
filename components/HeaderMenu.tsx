@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { Menu as MenuIcon, LogOut, Globe, Settings } from 'lucide-react';
+import { Menu as MenuIcon, LogOut, Globe } from 'lucide-react';
 import { signOutAction } from '@/app/actions';
 
 export default function HeaderMenu() {
@@ -24,14 +23,6 @@ export default function HeaderMenu() {
             onClick={() => setOpen(false)}
           />
           <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
-            <Link
-              href="/profile"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-              Paramètres
-            </Link>
             <a
               href="https://perfconnect.fr"
               target="_blank"
