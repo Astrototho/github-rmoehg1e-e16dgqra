@@ -109,6 +109,8 @@ export default function ProfileTabs({
       ) : (
         <div className="p-4 space-y-3">
           <CityPicker
+            currentCity={city}
+            currentCountry={country}
             onSelected={(params) => {
               setCity(params.city);
               setCountry(params.country);
