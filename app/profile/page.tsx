@@ -1,4 +1,4 @@
-import { Settings, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
 import { createAdminClient } from '@/lib/supabase-admin';
@@ -42,19 +42,8 @@ export default async function ProfilePage() {
     .eq('id', currentUser.id)
     .single();
 
-  const username =
-    currentUser.strava_username ??
-    currentUser.name.toLowerCase().replace(/\s/g, '_');
-
   return (
     <div className="flex flex-col h-full bg-white">
-      <header className="px-4 h-14 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur-md z-40">
-        <h1 className="text-xl font-bold text-gray-900">@{username}</h1>
-        <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-          <Settings className="w-6 h-6 text-gray-900" />
-        </button>
-      </header>
-
       <div className="overflow-y-auto pb-6">
         <div className="p-4">
           <div className="flex items-center justify-between mb-4">
