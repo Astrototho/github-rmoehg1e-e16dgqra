@@ -4,6 +4,7 @@ import {
   getActivityById,
   getActivityParticipations,
   getMyParticipationForActivity,
+  getMyMatchFeedback,
 } from '@/app/actions';
 import { getCurrentUser } from '@/lib/session';
 
@@ -34,6 +35,9 @@ export default async function ActivityDetailPage({ params }: PageProps) {
     ? myParticipationResult.data
     : null;
 
+  const matchFeedbackResult = await getMyMatchFeedback(activity.id);
+  const myMatchFeedback = matchFeedbackResult.data?.accurate ?? null;
+
   return (
     <ActivityDetailClient
       activity={activity}
@@ -43,6 +47,7 @@ export default async function ActivityDetailPage({ params }: PageProps) {
       isOrganizer={
         currentUser ? activity.organizer_id === currentUser.id : false
       }
+      myMatchFeedback={myMatchFeedback}
     />
   );
 }

@@ -759,3 +759,80 @@ export async function getNotificationsAndMarkResponsesRead() {
     return { success: false, error: 'Impossible de charger les notifications.' };
   }
 }
+
+export async function submitMatchFeedback(
+  activityId: string,
+  ratedId: string,
+  accurate: boolean
+) {
+  try {
+    const currentUser = await requireAuth();
+
+    const { error } = await admin().from('match_feedback').upsert(
+      {
+        activity_id: activityId,
+        rater_id: currentUser.id,
+        rated_id: ratedId,
+        accurate,
+      },
+      { onConflict: 'activity_id,rater_id' }
+    );
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    console.error('Erreur submitMatchFeedback:', err);
+    return { success: false, error: "Impossible d'enregistrer ton retour." };
+  }
+}
+
+export async function getMyMatchFeedback(activityId: string) {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return { success: true, data: null };
+
+    const { data, error } = await admin()
+      .from('match_feedback')
+      .select('accurate')
+      .eq('activity_id', activityId)
+      .eq('rater_id', currentUser.id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err) {
+    console.error('Erreur getMyMatchFeedback:', err);
+    return { success: true, data: null };
+  }
+}
+
+export async function reportUser(params: {
+  activityId?: string;
+  reportedId: string;
+  reason: string;
+  description?: string;
+}) {
+  try {
+    const currentUser = await requireAuth();
+
+    if (params.reportedId === currentUser.id) {
+      return { success: false, error: 'Action non autorisée.' };
+    }
+
+    const { error } = await admin().from('user_reports').insert([
+      {
+        activity_id: params.activityId ?? null,
+        reporter_id: currentUser.id,
+        reported_id: params.reportedId,
+        reason: params.reason,
+        description: params.description ?? null,
+      },
+    ]);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    console.error('Erreur reportUser:', err);
+    return { success: false, error: "Impossible d'envoyer le signalement." };
+  }
+}

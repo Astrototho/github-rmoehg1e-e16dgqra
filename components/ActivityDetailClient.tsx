@@ -18,6 +18,8 @@ import {
   updateParticipationStatus,
 } from '@/app/actions';
 import type { Activity, Participation, ParticipationWithUser } from '@/lib/types';
+import ReportUserButton from '@/components/ReportUserButton';
+import MatchFeedbackPrompt from '@/components/MatchFeedbackPrompt';
 
 interface ActivityDetailClientProps {
   activity: Activity;
@@ -28,6 +30,7 @@ interface ActivityDetailClientProps {
   myParticipation: Participation | null;
   currentUserId: string | null;
   isOrganizer: boolean;
+  myMatchFeedback: boolean | null;
 }
 
 const sportLabels: Record<string, string> = {
@@ -52,6 +55,7 @@ export default function ActivityDetailClient({
   myParticipation,
   currentUserId,
   isOrganizer,
+  myMatchFeedback,
 }: ActivityDetailClientProps) {
   const [pending, setPending] = useState(participations.pending);
   const [approved, setApproved] = useState(participations.approved);
@@ -61,6 +65,7 @@ export default function ActivityDetailClient({
 
   const sportLabel = sportLabels[activity.type] || activity.type;
   const sportEmoji = sportEmojis[activity.type] || '🏅';
+  const isPast = new Date(activity.start_date).getTime() < Date.now();
 
   const dateObj = new Date(activity.start_date);
   const dateStr = dateObj.toLocaleDateString('fr-FR', {
@@ -164,7 +169,7 @@ export default function ActivityDetailClient({
         {/* Organisateur */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <h3 className="font-bold text-gray-900 mb-3">Organisateur</h3>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <img
               src={activity.organizer_avatar}
               alt={activity.organizer_name}
@@ -185,6 +190,13 @@ export default function ActivityDetailClient({
                 Contacter
               </Link>
             )}
+            {!isOrganizer && currentUserId && (
+              <ReportUserButton
+                activityId={activity.id}
+                reportedId={activity.organizer_id}
+                reportedName={activity.organizer_name}
+              />
+            )}
           </div>
         </div>
 
@@ -203,7 +215,7 @@ export default function ActivityDetailClient({
           ) : (
             <div className="space-y-3">
               {approved.map((p) => (
-                <div key={p.id} className="flex items-center gap-3">
+                <div key={p.id} className="flex flex-wrap items-center gap-3">
                   <img
                     src={p.user_avatar}
                     alt={p.user_name}
@@ -231,11 +243,28 @@ export default function ActivityDetailClient({
                       Contacter
                     </Link>
                   )}
+                  {currentUserId && p.user_id !== currentUserId && (
+                    <ReportUserButton
+                      activityId={activity.id}
+                      reportedId={p.user_id}
+                      reportedName={p.user_name}
+                    />
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {/* Retour sur le matching (sortie passée, participant confirmé) */}
+        {!isOrganizer && isPast && myStatus === 'approved' && (
+          <MatchFeedbackPrompt
+            activityId={activity.id}
+            ratedId={activity.organizer_id}
+            ratedName={activity.organizer_name}
+            initialAnswer={myMatchFeedback}
+          />
+        )}
 
         {/* Demandes en attente (organisateur) */}
         {isOrganizer && pending.length > 0 && (
