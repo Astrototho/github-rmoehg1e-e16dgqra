@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase-admin';
 import type { Activity } from '@/lib/types';
 
 export const ACTIVITY_COLUMNS =
-  'id, created_at, title, type, start_date, location, distance, elevation, description, organizer_id, organizer_name, organizer_avatar';
+  'id, created_at, title, type, start_date, location, latitude, longitude, distance, elevation, description, organizer_id, organizer_name, organizer_avatar';
 
 export async function getAllActivities(): Promise<Activity[]> {
   const { data, error } = await createAdminClient()

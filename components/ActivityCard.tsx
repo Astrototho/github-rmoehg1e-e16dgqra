@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { MapPin, Calendar, TrendingUp, Users } from 'lucide-react';
+import { MapPin, Calendar, TrendingUp, Users, Navigation } from 'lucide-react';
 
 // 1. On met à jour l'interface pour coller EXACTEMENT à Supabase
 export interface Activity {
@@ -18,6 +18,7 @@ export interface Activity {
   // Champs purement visuels (optionnels car pas encore dans la base)
   routeImage?: string;
   matchPercentage?: number;
+  distanceFromViewerKm?: number;
   participants?: any[];
 }
 
@@ -81,13 +82,25 @@ export default function ActivityCard({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
 
-        {/* Match Badge (Affiché seulement s'il existe) */}
-        {activity.matchPercentage && (
-          <div className="absolute top-3 right-3 bg-white rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-lg">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-green-600 font-bold">
-              {activity.matchPercentage}%
-            </span>
+        {/* Match % et distance (affichés seulement s'ils existent) */}
+        {(activity.matchPercentage || activity.distanceFromViewerKm != null) && (
+          <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
+            {activity.matchPercentage && (
+              <div className="bg-white rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-lg">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-green-600 font-bold">
+                  {activity.matchPercentage}%
+                </span>
+              </div>
+            )}
+            {activity.distanceFromViewerKm != null && (
+              <div className="bg-white rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-lg">
+                <Navigation className="w-3.5 h-3.5 text-gray-500" />
+                <span className="text-gray-700 font-bold text-sm">
+                  {activity.distanceFromViewerKm} km
+                </span>
+              </div>
+            )}
           </div>
         )}
 

@@ -9,6 +9,8 @@ export interface Profile {
   strava_username?: string | null;
   city?: string | null;
   country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface AppUser {
@@ -17,6 +19,8 @@ export interface AppUser {
   avatar: string;
   bio?: string;
   strava_username?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export type ActivityType =
@@ -32,6 +36,8 @@ export interface Activity {
   type: string;
   start_date: string;
   location: string;
+  latitude?: number | null;
+  longitude?: number | null;
   distance: number;
   elevation: number;
   description?: string;

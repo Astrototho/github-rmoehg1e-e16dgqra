@@ -2,6 +2,7 @@ import ActivityCard from '@/components/ActivityCard';
 import {
   getApprovedParticipantsForActivities,
   getMatchPercentagesForActivities,
+  getActivityDistances,
 } from '@/app/actions';
 import { getAllActivities } from '@/lib/activities';
 import { getCurrentUser } from '@/lib/session';
@@ -19,9 +20,10 @@ export default async function Home() {
     ? allActivities.filter((a) => a.organizer_id !== currentUser.id)
     : allActivities;
   const activityIds = activities.map((a) => a.id);
-  const [participantsMap, matchMap] = await Promise.all([
+  const [participantsMap, matchMap, distanceMap] = await Promise.all([
     getApprovedParticipantsForActivities(activityIds),
     getMatchPercentagesForActivities(activities),
+    getActivityDistances(activities),
   ]);
 
   return (
@@ -44,6 +46,7 @@ export default async function Home() {
               ...act,
               participants: participantsMap[act.id] ?? [],
               matchPercentage: matchMap[act.id],
+              distanceFromViewerKm: distanceMap[act.id],
             }}
             href={`/activities/${act.id}`}
           />

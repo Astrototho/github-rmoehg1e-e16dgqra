@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation'; // <-- Ajout de useRouter
 import { X, MapPin, Calendar, TrendingUp } from 'lucide-react';
 import { createActivity } from '@/app/actions';
+import PlaceAutocomplete from '@/components/PlaceAutocomplete';
 
 type SportType = 'trail' | 'course-a-pied' | 'velo-route' | 'velo' | 'vtt';
 
@@ -174,12 +175,12 @@ export default function PropositionForm({ onClose }: PropositionFormProps) {
             <MapPin className="w-4 h-4 mr-2 text-gray-400" />
             Lieu de départ
           </label>
-          <input
-            type="text"
-            name="location"
+          <PlaceAutocomplete
             placeholder="Ex: Parking de la Mairie"
+            name="location"
+            latName="latitude"
+            lngName="longitude"
             required
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
           />
         </div>
 

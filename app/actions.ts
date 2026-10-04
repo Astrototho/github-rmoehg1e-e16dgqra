@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { getUserAvatar, getUserName, getUsersByIds } from '@/lib/users';
 import { getPerformanceProfilesForUsers } from '@/lib/performance';
 import { computeMatchPercentage } from '@/lib/matching';
+import { haversineDistanceKm } from '@/lib/distance';
 import {
   createNotification,
   getNotificationsForUser,
@@ -71,6 +72,13 @@ export async function createActivity(formData: FormData) {
     const elevation = Number(formData.get('elevation'));
     const description = formData.get('description') as string;
 
+    const rawLatitude = formData.get('latitude');
+    const rawLongitude = formData.get('longitude');
+    const latitude =
+      rawLatitude && !isNaN(Number(rawLatitude)) ? Number(rawLatitude) : null;
+    const longitude =
+      rawLongitude && !isNaN(Number(rawLongitude)) ? Number(rawLongitude) : null;
+
     if (!date || !time || !title) {
       return {
         success: false,
@@ -103,6 +111,8 @@ export async function createActivity(formData: FormData) {
         type,
         start_date,
         location,
+        latitude,
+        longitude,
         distance,
         elevation,
         description,
@@ -546,6 +556,34 @@ export async function getMatchPercentagesForActivities(
   }
 }
 
+export async function getActivityDistances(
+  activities: Pick<Activity, 'id' | 'latitude' | 'longitude'>[]
+): Promise<Record<string, number>> {
+  try {
+    const viewer = await getCurrentUser();
+    if (!viewer || viewer.latitude == null || viewer.longitude == null) {
+      return {};
+    }
+
+    const map: Record<string, number> = {};
+    for (const act of activities) {
+      if (act.latitude == null || act.longitude == null) continue;
+      const km = haversineDistanceKm(
+        viewer.latitude,
+        viewer.longitude,
+        act.latitude,
+        act.longitude
+      );
+      map[act.id] = Math.round(km * 10) / 10;
+    }
+
+    return map;
+  } catch (err) {
+    console.error('Erreur getActivityDistances:', err);
+    return {};
+  }
+}
+
 export async function signOutAction() {
   await signOut({ redirectTo: '/' });
 }
@@ -554,6 +592,36 @@ export async function getCurrentUserAction() {
   const user = await getCurrentUser();
   if (!user) return { success: false, error: 'Non authentifié' };
   return { success: true, data: user };
+}
+
+export async function updateProfileLocation(params: {
+  city: string;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+}) {
+  try {
+    const currentUser = await requireAuth();
+
+    const { error } = await admin()
+      .from('profiles')
+      .update({
+        city: params.city,
+        country: params.country,
+        latitude: params.latitude,
+        longitude: params.longitude,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', currentUser.id);
+
+    if (error) throw error;
+
+    revalidatePath('/profile');
+    return { success: true };
+  } catch (err) {
+    console.error('Erreur updateProfileLocation:', err);
+    return { success: false, error: "Impossible de mettre à jour ta ville." };
+  }
 }
 
 function formatMessageTime(dateStr: string) {

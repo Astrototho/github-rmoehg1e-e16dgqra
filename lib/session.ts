@@ -12,6 +12,8 @@ function mapProfileToAppUser(profile: Profile): AppUser {
     avatar: profile.avatar_url ?? DEFAULT_AVATAR,
     bio: profile.bio ?? undefined,
     strava_username: profile.strava_username ?? undefined,
+    latitude: profile.latitude,
+    longitude: profile.longitude,
   };
 }
 

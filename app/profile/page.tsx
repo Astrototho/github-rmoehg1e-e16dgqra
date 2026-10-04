@@ -1,18 +1,10 @@
-import { Settings, Grid, Map, Share, Zap } from 'lucide-react';
+import { Settings, Share, Zap } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
 import { createAdminClient } from '@/lib/supabase-admin';
 import { hasActivityScopeConnected } from '@/lib/performance';
 import { signIn } from '@/auth';
-
-const mockGridPhotos = [
-  'https://images.unsplash.com/photo-1551632811-561732d1e306?q=80&w=400&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1541625602330-2277a4c4618c?q=80&w=400&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=400&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1502224562085-639556652f33?q=80&w=400&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1511994298241-608e28f14fde?q=80&w=400&auto=format&fit=crop',
-];
+import ProfileTabs from '@/components/ProfileTabs';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +28,18 @@ export default async function ProfilePage() {
     .select('*', { count: 'exact', head: true })
     .eq('user_id', currentUser.id)
     .eq('status', 'approved');
+
+  const { data: myActivities } = await admin
+    .from('activities')
+    .select('id, title, type, start_date')
+    .eq('organizer_id', currentUser.id)
+    .order('start_date', { ascending: false });
+
+  const { data: profileRow } = await admin
+    .from('profiles')
+    .select('city, country, latitude, longitude')
+    .eq('id', currentUser.id)
+    .single();
 
   const username =
     currentUser.strava_username ??
@@ -119,33 +123,13 @@ export default async function ProfilePage() {
           )}
         </div>
 
-        <div className="sticky top-14 bg-white border-b border-gray-100 z-30">
-          <div className="flex gap-6 px-4 text-sm font-medium">
-            <button className="py-3 text-primary border-b-2 border-primary flex items-center gap-1.5">
-              <Grid className="w-4 h-4" />
-              Grille
-            </button>
-            <button className="py-3 text-gray-600 border-b-2 border-transparent hover:text-gray-900 flex items-center gap-1.5">
-              <Map className="w-4 h-4" />
-              Carte
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-1 p-0">
-          {mockGridPhotos.map((photo, idx) => (
-            <div
-              key={idx}
-              className="relative aspect-square overflow-hidden bg-gray-100"
-            >
-              <img
-                src={photo}
-                alt={`Photo ${idx + 1}`}
-                className="w-full h-full object-cover hover:opacity-90 transition-opacity cursor-pointer"
-              />
-            </div>
-          ))}
-        </div>
+        <ProfileTabs
+          activities={myActivities ?? []}
+          city={profileRow?.city}
+          country={profileRow?.country}
+          latitude={profileRow?.latitude}
+          longitude={profileRow?.longitude}
+        />
       </div>
     </div>
   );
