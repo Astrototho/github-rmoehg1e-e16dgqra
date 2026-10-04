@@ -1,10 +1,11 @@
-import { Settings, Share, Zap } from 'lucide-react';
+import { Settings, Zap } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
 import { createAdminClient } from '@/lib/supabase-admin';
 import { hasActivityScopeConnected } from '@/lib/performance';
 import { signIn } from '@/auth';
 import ProfileTabs from '@/components/ProfileTabs';
+import ShareInviteButton from '@/components/ShareInviteButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,14 +66,7 @@ export default async function ProfilePage() {
               />
             </div>
 
-            <div className="flex gap-2">
-              <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
-                Suivre
-              </button>
-              <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                <Share className="w-5 h-5 text-gray-600" />
-              </button>
-            </div>
+            <ShareInviteButton />
           </div>
 
           <div className="mb-3">
@@ -87,14 +81,6 @@ export default async function ProfilePage() {
                 {(organizedCount ?? 0) + (participationCount ?? 0)}
               </p>
               <p className="text-xs text-gray-500">Sorties</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-gray-900">0</p>
-              <p className="text-xs text-gray-500">Suiveurs</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-gray-900">0</p>
-              <p className="text-xs text-gray-500">Abonnements</p>
             </div>
           </div>
 
