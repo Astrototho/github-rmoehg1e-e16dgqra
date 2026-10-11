@@ -1,4 +1,5 @@
 import ActivityCard from '@/components/ActivityCard';
+import InstallAppPrompt from '@/components/InstallAppPrompt';
 import { getUpcomingActivities } from '@/lib/activities';
 import { getApprovedParticipantsForActivities } from '@/lib/participations';
 import { getDistancesFromViewer, getMatchPercentages, sortFeed } from '@/lib/feed';
@@ -23,6 +24,8 @@ export default async function Home() {
 
   return (
     <div className="space-y-6 p-4">
+      {currentUser && <InstallAppPrompt variant="banner" />}
+
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-xl font-bold">
           <span className="h-6 w-1.5 rounded-full bg-primary"></span>

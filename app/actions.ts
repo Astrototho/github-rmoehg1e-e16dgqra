@@ -30,6 +30,13 @@ import {
 import { getValidStravaAccessToken } from '@/lib/strava-tokens';
 import { deauthorizeStrava } from '@/lib/strava';
 import { isRateLimited } from '@/lib/rate-limit';
+import { runInBackground } from '@/lib/background';
+import {
+  deletePushSubscriptionForUser,
+  isAllowedPushEndpoint,
+  savePushSubscriptionForUser,
+  sendPushToUsers,
+} from '@/lib/push';
 import { parisLocalToUtc, formatLongDate, formatTime } from '@/lib/dates';
 import {
   EDIT_CUTOFF_MS,
@@ -560,6 +567,16 @@ export async function sendMessage(
       .single();
 
     if (error) throw error;
+
+    runInBackground('push nouveau message', () =>
+      sendPushToUsers([receiverId], {
+        title: `Message de ${currentUser.name}`,
+        body: parsed.data.length > 140 ? `${parsed.data.slice(0, 140)}…` : parsed.data,
+        url: `/messages/${currentUser.id}`,
+        tag: `message-${currentUser.id}`,
+      })
+    );
+
     return { success: true, data: data as Message };
   } catch (err) {
     console.error('Erreur sendMessage:', err);
@@ -718,6 +735,58 @@ export async function deleteSavedPlaceAction(placeId: string): Promise<ActionRes
   if (!result.success) return fail(result.error ?? 'Impossible de supprimer ce lieu.');
 
   revalidatePath('/settings');
+  return { success: true };
+}
+
+// -----------------------------------------------------------------------------
+// Notifications push (PWA)
+// -----------------------------------------------------------------------------
+
+const base64UrlKey = (max: number) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .regex(/^[A-Za-z0-9_-]+={0,2}$/);
+
+const pushSubscriptionSchema = z.object({
+  endpoint: z
+    .string()
+    .max(1000)
+    .refine(isAllowedPushEndpoint, 'Service de notification non reconnu.'),
+  keys: z.object({ p256dh: base64UrlKey(200), auth: base64UrlKey(100) }),
+});
+
+export async function savePushSubscription(
+  subscription: unknown,
+  userAgent?: string
+): Promise<ActionResult> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return authError();
+
+  const parsed = pushSubscriptionSchema.safeParse(subscription);
+  if (!parsed.success) return fail(firstErrorMessage(parsed.error));
+
+  const saved = await savePushSubscriptionForUser(
+    currentUser.id,
+    {
+      endpoint: parsed.data.endpoint,
+      p256dh: parsed.data.keys.p256dh,
+      auth: parsed.data.keys.auth,
+    },
+    typeof userAgent === 'string' ? userAgent.slice(0, 300) : null
+  );
+  return saved
+    ? { success: true }
+    : fail("Impossible d'activer les notifications sur cet appareil.");
+}
+
+export async function deletePushSubscription(endpoint: unknown): Promise<ActionResult> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return authError();
+  if (typeof endpoint !== 'string' || endpoint.length > 1000) return fail('Données invalides.');
+
+  await deletePushSubscriptionForUser(currentUser.id, endpoint);
   return { success: true };
 }
 
