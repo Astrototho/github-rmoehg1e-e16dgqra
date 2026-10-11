@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Flag } from 'lucide-react';
 import { reportUser } from '@/app/actions';
+import { DESCRIPTION_MAX, REPORT_REASONS } from '@/lib/constraints';
 
 interface ReportUserButtonProps {
   activityId?: string;
@@ -10,26 +11,21 @@ interface ReportUserButtonProps {
   reportedName: string;
 }
 
-const REASONS = [
-  'Comportement déplacé',
-  'Message inapproprié',
-  "Ne s'est pas présenté",
-  'Autre',
-];
-
 export default function ReportUserButton({
   activityId,
   reportedId,
   reportedName,
 }: ReportUserButtonProps) {
   const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState(REASONS[0]);
+  const [reason, setReason] = useState<string>(REPORT_REASONS[0]);
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    setError(null);
     const result = await reportUser({
       activityId,
       reportedId,
@@ -44,10 +40,10 @@ export default function ReportUserButton({
         setOpen(false);
         setSent(false);
         setDescription('');
-        setReason(REASONS[0]);
+        setReason(REPORT_REASONS[0]);
       }, 1500);
     } else {
-      alert(result.error);
+      setError(result.error);
     }
   };
 
@@ -56,31 +52,29 @@ export default function ReportUserButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        aria-label={`Signaler ${reportedName}`}
         title={`Signaler ${reportedName}`}
-        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors flex-shrink-0"
+        className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
       >
-        <Flag className="w-3.5 h-3.5" />
+        <Flag className="h-4 w-4" />
       </button>
     );
   }
 
   return (
-    <div className="w-full mt-2 p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+    <div className="mt-2 w-full space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
       {sent ? (
-        <p className="text-xs text-green-600 font-medium">
-          Signalement envoyé, merci.
-        </p>
+        <p className="text-xs font-medium text-green-600">Signalement envoyé, merci.</p>
       ) : (
         <>
-          <p className="text-xs font-semibold text-gray-700">
-            Signaler {reportedName}
-          </p>
+          <p className="text-xs font-semibold text-gray-700">Signaler {reportedName}</p>
           <select
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+            aria-label="Motif du signalement"
+            className="w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs"
           >
-            {REASONS.map((r) => (
+            {REPORT_REASONS.map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>
@@ -91,17 +85,19 @@ export default function ReportUserButton({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Détails (optionnel)"
             rows={2}
-            className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 resize-none"
+            maxLength={DESCRIPTION_MAX}
+            className="w-full resize-none rounded-lg border border-gray-200 px-2 py-1.5 text-xs"
           />
           <p className="text-[10px] text-gray-400">
             Confidentiel — jamais visible par la personne signalée.
           </p>
+          {error && <p className="text-xs text-red-600">{error}</p>}
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setOpen(false)}
               disabled={isSubmitting}
-              className="flex-1 text-xs py-1.5 text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="min-h-[40px] flex-1 rounded-lg border border-gray-200 bg-white text-xs text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
             >
               Annuler
             </button>
@@ -109,7 +105,7 @@ export default function ReportUserButton({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="flex-1 text-xs py-1.5 text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              className="min-h-[40px] flex-1 rounded-lg bg-red-600 text-xs text-white transition-colors hover:bg-red-700 disabled:opacity-50"
             >
               {isSubmitting ? 'Envoi...' : 'Envoyer'}
             </button>

@@ -64,3 +64,15 @@ export async function refreshStravaAccessToken(
     expiresAt: new Date(data.expires_at * 1000).toISOString(),
   };
 }
+
+/** Révoque l'accès de PerfConnect au compte Strava (suppression de compte). */
+export async function deauthorizeStrava(accessToken: string): Promise<void> {
+  const res = await fetch('https://www.strava.com/oauth/deauthorize', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    throw new Error(`Strava deauthorize ${res.status}: ${await res.text()}`);
+  }
+}

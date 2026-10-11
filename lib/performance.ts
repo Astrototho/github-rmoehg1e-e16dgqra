@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase-admin';
 import { fetchStravaActivities, type StravaActivitySummary } from '@/lib/strava';
-import type { ActivityType } from '@/lib/types';
+import { getValidStravaAccessToken } from '@/lib/strava-tokens';
+import type { ActivityType } from '@/lib/sports';
 
 // Correspondance type Strava → famille de sport interne à l'app.
 // Isolée pour être ajustable sans toucher au reste du calcul.
@@ -10,16 +11,19 @@ export const SPORT_TYPE_TO_FAMILY: Record<string, ActivityType> = {
   MountainBikeRide: 'vtt',
   EMountainBikeRide: 'vtt',
   GravelRide: 'velo-route',
-  Ride: 'velo',
-  VirtualRide: 'velo',
-  EBikeRide: 'velo',
-  Handcycle: 'velo',
-  Velomobile: 'velo',
+  Ride: 'velo-route',
+  VirtualRide: 'velo-route',
+  EBikeRide: 'velo-route',
+  Handcycle: 'velo-route',
+  Velomobile: 'velo-route',
 };
 
 // Sous ce seuil d'activités pour une famille de sport, on considère qu'il n'y
 // a pas assez de données pour un score fiable.
 const MIN_ACTIVITIES_PER_FAMILY = 2;
+
+// Le profil est recalculé au plus une fois par jour (appels API Strava limités).
+const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export interface SportFamilyIndices {
   sportFamily: ActivityType;
@@ -113,7 +117,34 @@ export async function refreshPerformanceProfile(
   } catch (err) {
     console.error('Erreur refreshPerformanceProfile:', err);
     return { success: false, error: String(err) };
+  } finally {
+    await createAdminClient()
+      .from('strava_tokens')
+      .update({ last_profile_refresh_at: new Date().toISOString() })
+      .eq('user_id', userId);
   }
+}
+
+/**
+ * Recalcule le profil de performance si la dernière tentative date de plus de
+ * 24 h. Pensé pour être lancé en tâche de fond (runInBackground).
+ */
+export async function refreshPerformanceProfileIfStale(userId: string) {
+  const { data, error } = await createAdminClient()
+    .from('strava_tokens')
+    .select('last_profile_refresh_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error || !data) return;
+
+  const last = data.last_profile_refresh_at
+    ? new Date(data.last_profile_refresh_at).getTime()
+    : 0;
+  if (Date.now() - last < PROFILE_MAX_AGE_MS) return;
+
+  const accessToken = await getValidStravaAccessToken(userId);
+  if (!accessToken) return;
+  await refreshPerformanceProfile(userId, accessToken);
 }
 
 export async function getPerformanceProfilesForUsers(

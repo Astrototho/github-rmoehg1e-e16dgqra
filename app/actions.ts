@@ -1,55 +1,64 @@
 'use server';
 
-import { createAdminClient } from '@/lib/supabase-admin';
-import { ACTIVITY_COLUMNS } from '@/lib/activities';
-import { getCurrentUser, requireAuth } from '@/lib/session';
-import { signOut } from '@/auth';
+// Server Actions appelées depuis les composants client. Chaque action est un
+// point d'entrée HTTP public : elle revérifie la session, valide tous ses
+// arguments et renvoie { success, data?, error? } au lieu de lever une erreur.
+// Les lectures faites pendant le rendu des pages serveur vivent dans lib/.
+
 import { revalidatePath } from 'next/cache';
-import { getUserAvatar, getUserName, getUsersByIds } from '@/lib/users';
-import { getPerformanceProfilesForUsers } from '@/lib/performance';
-import { computeMatchPercentage } from '@/lib/matching';
-import { haversineDistanceKm } from '@/lib/distance';
+import { z } from 'zod';
+import { signOut } from '@/auth';
+import { createAdminClient } from '@/lib/supabase-admin';
+import { getCurrentUser } from '@/lib/session';
+import { getActivityByIdFromDb } from '@/lib/activities';
+import { getUserParticipation, getParticipantIdsToNotify } from '@/lib/participations';
+import { getMatchPercentages } from '@/lib/feed';
+import { MATCHING_VERSION } from '@/lib/matching';
+import { getUserById } from '@/lib/users';
+import { getConversationMessages } from '@/lib/conversations';
+import { markConversationAsRead } from '@/lib/messages';
 import {
   createNotification,
-  getNotificationsForUser,
-  getUnreadNotificationCount,
-  markResponseNotificationsAsRead,
+  createNotifications,
   markNotificationsByRelatedId,
 } from '@/lib/notifications';
 import {
-  getUnreadConversationsCount,
-  markConversationAsRead,
-} from '@/lib/messages';
-import type {
-  Activity,
-  ActivityType,
-  ConversationPreview,
-  Participation,
-  ParticipationWithUser,
-  Profile,
-} from '@/lib/types';
+  deleteSavedPlace,
+  renameSavedPlace,
+  upsertSavedPlace,
+} from '@/lib/saved-places';
+import { getValidStravaAccessToken } from '@/lib/strava-tokens';
+import { deauthorizeStrava } from '@/lib/strava';
+import { isRateLimited } from '@/lib/rate-limit';
+import { parisLocalToUtc, formatLongDate, formatTime } from '@/lib/dates';
+import {
+  EDIT_CUTOFF_MS,
+  canEditActivity,
+  isOpen,
+  isPast,
+  isValidNewStartDate,
+} from '@/lib/activity-rules';
+import {
+  activityFormSchema,
+  buildDefaultTitle,
+  firstErrorMessage,
+  formDataToObject,
+  isValidUserId,
+  isValidUuid,
+  messageContentSchema,
+  placeNameSchema,
+  reportSchema,
+  type ActivityFormValues,
+} from '@/lib/validation';
+import type { Activity, AppUser, Message } from '@/lib/types';
+
+type ActionResult<T = undefined> =
+  | { success: true; data?: T }
+  | { success: false; error: string };
 
 const admin = () => createAdminClient();
 
-const DEFAULT_AVATAR =
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=100';
-
-async function enrichParticipations(
-  participations: Participation[]
-): Promise<ParticipationWithUser[]> {
-  const userIds = Array.from(new Set(participations.map((p) => p.user_id)));
-  const profiles = await getUsersByIds(userIds);
-  const profileMap = new Map(profiles.map((p) => [p.id, p]));
-
-  return participations.map((p) => {
-    const profile = profileMap.get(p.user_id);
-    return {
-      ...p,
-      user_name: profile?.name ?? 'Utilisateur',
-      user_avatar: profile?.avatar_url ?? DEFAULT_AVATAR,
-    };
-  });
-}
+const UNIQUE_VIOLATION = '23505';
 
 function authError() {
   return {
@@ -58,276 +67,286 @@ function authError() {
   };
 }
 
-export async function createActivity(formData: FormData) {
+function fail(error: string) {
+  return { success: false as const, error };
+}
+
+function revalidateActivity(activityId: string) {
+  revalidatePath('/');
+  revalidatePath('/activities');
+  revalidatePath(`/activities/${activityId}`);
+}
+
+// -----------------------------------------------------------------------------
+// Sorties
+// -----------------------------------------------------------------------------
+
+type ParsedActivityForm =
+  | { ok: true; values: ActivityFormValues; startDate: Date; title: string }
+  | { ok: false; error: string };
+
+function parseActivityForm(formData: FormData): ParsedActivityForm {
+  const parsed = activityFormSchema.safeParse(formDataToObject(formData));
+  if (!parsed.success) return { ok: false, error: firstErrorMessage(parsed.error) };
+
+  const values = parsed.data;
+  const startDate = parisLocalToUtc(values.date, values.time);
+  if (!startDate) {
+    return { ok: false, error: "Le format de la date ou de l'heure est invalide." };
+  }
+
+  return {
+    ok: true,
+    values,
+    startDate,
+    title: values.title ?? buildDefaultTitle(values),
+  };
+}
+
+function activityRow(parsed: Extract<ParsedActivityForm, { ok: true }>) {
+  const { values, startDate, title } = parsed;
+  return {
+    title,
+    type: values.type,
+    start_date: startDate.toISOString(),
+    location: values.location,
+    latitude: values.latitude,
+    longitude: values.longitude,
+    distance: values.distance,
+    elevation: values.elevation,
+    description: values.description,
+  };
+}
+
+export async function createActivity(
+  formData: FormData
+): Promise<ActionResult<{ id: string }>> {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) return authError();
 
-    const title = formData.get('title') as string;
-    const type = formData.get('type') as string;
-    const date = formData.get('date') as string;
-    const time = formData.get('time') as string;
-    const location = formData.get('location') as string;
-    const distance = Number(formData.get('distance'));
-    const elevation = Number(formData.get('elevation'));
-    const description = formData.get('description') as string;
-
-    const rawLatitude = formData.get('latitude');
-    const rawLongitude = formData.get('longitude');
-    const latitude =
-      rawLatitude && !isNaN(Number(rawLatitude)) ? Number(rawLatitude) : null;
-    const longitude =
-      rawLongitude && !isNaN(Number(rawLongitude)) ? Number(rawLongitude) : null;
-
-    if (!date || !time || !title) {
-      return {
-        success: false,
-        error: "La date, l'heure et le titre sont obligatoires.",
-      };
+    const parsed = parseActivityForm(formData);
+    if (!parsed.ok) return fail(parsed.error);
+    if (parsed.startDate.getTime() <= Date.now()) {
+      return fail('La date de la sortie doit être dans le futur.');
+    }
+    if (await isRateLimited('activities', currentUser.id)) {
+      return fail("Tu as publié beaucoup de sorties aujourd'hui, réessaie demain.");
     }
 
-    const dateTimeString = `${date}T${time}:00`;
-    const dateObj = new Date(dateTimeString);
-
-    if (isNaN(dateObj.getTime())) {
-      return {
-        success: false,
-        error: "Le format de la date ou de l'heure est invalide.",
-      };
-    }
-
-    if (dateObj.getTime() < Date.now()) {
-      return {
-        success: false,
-        error: 'La date de la sortie doit être dans le futur.',
-      };
-    }
-
-    const start_date = dateObj.toISOString();
-
-    const { error } = await admin().from('activities').insert([
-      {
-        title,
-        type,
-        start_date,
-        location,
-        latitude,
-        longitude,
-        distance,
-        elevation,
-        description,
+    const { data, error } = await admin()
+      .from('activities')
+      .insert({
+        ...activityRow(parsed),
         organizer_id: currentUser.id,
         organizer_name: currentUser.name,
         organizer_avatar: currentUser.avatar,
-      },
-    ]);
+      })
+      .select('id')
+      .single();
 
     if (error) {
-      console.error('Erreur Supabase:', error);
-      return {
-        success: false,
-        error: "Impossible d'enregistrer la sortie dans la base de données.",
-      };
+      console.error('Erreur createActivity:', error);
+      return fail("Impossible d'enregistrer la sortie.");
     }
 
-    revalidatePath('/');
-    revalidatePath('/activities');
-    return { success: true };
+    await upsertSavedPlace(currentUser.id, {
+      name: parsed.values.location,
+      latitude: parsed.values.latitude,
+      longitude: parsed.values.longitude,
+    });
+
+    revalidateActivity(data.id);
+    revalidatePath('/settings');
+    return { success: true, data: { id: data.id } };
   } catch (err) {
-    console.error('Erreur inattendue:', err);
-    return { success: false, error: 'Une erreur inattendue est survenue.' };
+    console.error('Erreur inattendue createActivity:', err);
+    return fail('Une erreur inattendue est survenue.');
   }
 }
 
-export async function getMyActivities() {
+/** Liste lisible des changements notables, pour la notification envoyée. */
+function describeChanges(before: Activity, after: ReturnType<typeof activityRow>) {
+  const changes: string[] = [];
+  if (new Date(before.start_date).getTime() !== new Date(after.start_date).getTime()) {
+    changes.push(
+      `nouvelle date : ${formatLongDate(after.start_date)} à ${formatTime(after.start_date)}`
+    );
+  }
+  if (
+    before.location !== after.location ||
+    Number(before.latitude) !== after.latitude ||
+    Number(before.longitude) !== after.longitude
+  ) {
+    changes.push(`départ : ${after.location}`);
+  }
+  if (
+    Number(before.distance) !== after.distance ||
+    Number(before.elevation) !== after.elevation
+  ) {
+    changes.push(`parcours : ${after.distance} km / ${after.elevation} m D+`);
+  }
+  if (before.type !== after.type) changes.push('sport modifié');
+  if (before.title !== after.title || (before.description ?? null) !== after.description) {
+    changes.push('description mise à jour');
+  }
+  return changes;
+}
+
+async function loadEditableActivity(
+  activityId: string,
+  currentUser: AppUser
+): Promise<{ ok: true; activity: Activity } | { ok: false; error: string }> {
+  const activity = await getActivityByIdFromDb(activityId);
+  if (!activity) return { ok: false, error: 'Sortie introuvable.' };
+  if (activity.organizer_id !== currentUser.id) {
+    return { ok: false, error: 'Action non autorisée.' };
+  }
+  if (activity.status === 'cancelled') {
+    return { ok: false, error: 'Cette sortie a été annulée.' };
+  }
+  if (!canEditActivity(activity)) {
+    return {
+      ok: false,
+      error: "Une sortie ne peut plus être modifiée ni annulée moins d'1 h avant le départ.",
+    };
+  }
+  return { ok: true, activity };
+}
+
+export async function updateActivity(
+  activityId: string,
+  formData: FormData
+): Promise<ActionResult<{ id: string }>> {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) return authError();
+    if (!isValidUuid(activityId)) return fail('Sortie introuvable.');
 
-    const now = new Date().toISOString();
+    const loaded = await loadEditableActivity(activityId, currentUser);
+    if (!loaded.ok) return fail(loaded.error);
 
-    const { data: organizedData, error: orgError } = await admin()
+    const parsed = parseActivityForm(formData);
+    if (!parsed.ok) return fail(parsed.error);
+    if (!isValidNewStartDate(parsed.startDate)) {
+      return fail('La nouvelle date doit être au moins 1 h dans le futur.');
+    }
+
+    const row = activityRow(parsed);
+    // Les conditions sont répétées dans la requête : si la sortie a été
+    // annulée ou a dépassé la limite entre-temps, aucune ligne n'est modifiée.
+    const cutoff = new Date(Date.now() + EDIT_CUTOFF_MS).toISOString();
+    const { data, error } = await admin()
       .from('activities')
-      .select(ACTIVITY_COLUMNS)
-      .eq('organizer_id', currentUser.id);
+      .update({
+        ...row,
+        organizer_name: currentUser.name,
+        organizer_avatar: currentUser.avatar,
+      })
+      .eq('id', activityId)
+      .eq('organizer_id', currentUser.id)
+      .eq('status', 'active')
+      .gt('start_date', cutoff)
+      .select('id');
 
-    const { data: participationsData, error: partError } = await admin()
-      .from('participations')
-      .select(
-        `
-        status,
-        activities (${ACTIVITY_COLUMNS})
-      `
-      )
-      .eq('user_id', currentUser.id);
-
-    if (orgError || partError) {
-      console.error('Erreur Supabase:', orgError, partError);
-      return { success: false, error: 'Impossible de charger les données.' };
+    if (error) {
+      console.error('Erreur updateActivity:', error);
+      return fail('Impossible de modifier la sortie.');
+    }
+    if (!data || data.length === 0) {
+      return fail("Une sortie ne peut plus être modifiée moins d'1 h avant le départ.");
     }
 
-    type ParticipationRow = {
-      status: string;
-      activities: Activity | null;
-    };
+    await upsertSavedPlace(currentUser.id, {
+      name: parsed.values.location,
+      latitude: parsed.values.latitude,
+      longitude: parsed.values.longitude,
+    });
 
-    const rows = (participationsData ?? []) as unknown as ParticipationRow[];
+    const changes = describeChanges(loaded.activity, row);
+    if (changes.length > 0) {
+      const participantIds = await getParticipantIdsToNotify(activityId);
+      await createNotifications(
+        participantIds.map((userId) => ({
+          userId,
+          type: 'activity_updated' as const,
+          title: 'Sortie modifiée',
+          body: `"${row.title}" a été modifiée : ${changes.join(', ')}.`,
+          link: `/activities/${activityId}`,
+        }))
+      );
+    }
 
-    const myActivities = {
-      'mes-sorties':
-        organizedData?.filter((a) => (a as Activity).start_date >= now) || [],
-      validees:
-        rows
-          .filter(
-            (p) =>
-              p.status === 'approved' &&
-              p.activities &&
-              p.activities.start_date >= now
-          )
-          .map((p) => p.activities!) || [],
-      'en-cours':
-        rows
-          .filter(
-            (p) =>
-              p.status === 'pending' &&
-              p.activities &&
-              p.activities.start_date >= now
-          )
-          .map((p) => p.activities!) || [],
-      passees: [
-        ...(organizedData?.filter((a) => (a as Activity).start_date < now) ||
-          []),
-        ...(rows
-          .filter(
-            (p) =>
-              p.status === 'approved' &&
-              p.activities &&
-              p.activities.start_date < now
-          )
-          .map((p) => p.activities!) || []),
-      ],
-    };
-
-    return { success: true, data: myActivities };
+    revalidateActivity(activityId);
+    revalidatePath('/settings');
+    return { success: true, data: { id: activityId } };
   } catch (err) {
-    console.error('Erreur inattendue:', err);
-    return {
-      success: false,
-      error: 'Une erreur est survenue lors du chargement.',
-    };
+    console.error('Erreur inattendue updateActivity:', err);
+    return fail('Une erreur inattendue est survenue.');
   }
 }
 
-export async function getConversation(contactId: string) {
+export async function cancelActivity(activityId: string): Promise<ActionResult> {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) return authError();
+    if (!isValidUuid(activityId)) return fail('Sortie introuvable.');
 
+    const loaded = await loadEditableActivity(activityId, currentUser);
+    if (!loaded.ok) return fail(loaded.error);
+
+    const cutoff = new Date(Date.now() + EDIT_CUTOFF_MS).toISOString();
     const { data, error } = await admin()
-      .from('messages')
-      .select('*')
-      .or(
-        `and(sender_id.eq.${currentUser.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${currentUser.id})`
-      )
-      .order('created_at', { ascending: true });
+      .from('activities')
+      .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+      .eq('id', activityId)
+      .eq('organizer_id', currentUser.id)
+      .eq('status', 'active')
+      .gt('start_date', cutoff)
+      .select('id');
 
-    if (error) throw error;
+    if (error) {
+      console.error('Erreur cancelActivity:', error);
+      return fail("Impossible d'annuler la sortie.");
+    }
+    if (!data || data.length === 0) {
+      return fail("Une sortie ne peut plus être annulée moins d'1 h avant le départ.");
+    }
 
-    await markConversationAsRead(currentUser.id, contactId);
-    // Rafraîchit le badge "Messages" de la barre de navigation (layout racine).
+    // Les demandes en attente n'ont plus à être traitées : on retire les
+    // notifications "participation_request" correspondantes de la cloche.
+    const { data: pending } = await admin()
+      .from('participations')
+      .select('id')
+      .eq('activity_id', activityId)
+      .eq('status', 'pending');
+    await markNotificationsByRelatedId((pending ?? []).map((p) => p.id as string));
+
+    const participantIds = await getParticipantIdsToNotify(activityId);
+    await createNotifications(
+      participantIds.map((userId) => ({
+        userId,
+        type: 'activity_cancelled' as const,
+        title: 'Sortie annulée',
+        body: `"${loaded.activity.title}" prévue le ${formatLongDate(
+          loaded.activity.start_date
+        )} a été annulée par l'organisateur.`,
+        link: `/activities/${activityId}`,
+      }))
+    );
+
+    revalidateActivity(activityId);
     revalidatePath('/', 'layout');
-
-    return { success: true, data };
-  } catch (err) {
-    console.error('Erreur getConversation:', err);
-    return { success: false, error: 'Impossible de charger les messages.' };
-  }
-}
-
-export async function sendMessage(receiverId: string, content: string) {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) return authError();
-
-    const { error } = await admin().from('messages').insert([
-      {
-        sender_id: currentUser.id,
-        sender_name: currentUser.name,
-        sender_avatar: currentUser.avatar,
-        receiver_id: receiverId,
-        content: content,
-      },
-    ]);
-
-    if (error) throw error;
-
     return { success: true };
   } catch (err) {
-    console.error('Erreur sendMessage:', err);
-    return { success: false, error: "Impossible d'envoyer le message." };
+    console.error('Erreur inattendue cancelActivity:', err);
+    return fail('Une erreur inattendue est survenue.');
   }
 }
 
-export async function getActivityById(id: string) {
-  try {
-    const { getActivityByIdFromDb } = await import('@/lib/activities');
-    const data = await getActivityByIdFromDb(id);
-    if (!data) throw new Error('Not found');
-    return { success: true, data };
-  } catch (err) {
-    console.error('Erreur getActivityById:', err);
-    return { success: false, error: 'Sortie introuvable.' };
-  }
-}
-
-export async function getActivityParticipations(activityId: string) {
-  try {
-    const { data, error } = await admin()
-      .from('participations')
-      .select('*')
-      .eq('activity_id', activityId);
-
-    if (error) throw error;
-
-    const participations = await enrichParticipations(data as Participation[]);
-    return {
-      success: true,
-      data: {
-        pending: participations.filter((p) => p.status === 'pending'),
-        approved: participations.filter((p) => p.status === 'approved'),
-      },
-    };
-  } catch (err) {
-    console.error('Erreur getActivityParticipations:', err);
-    return {
-      success: false,
-      error: 'Impossible de charger les participations.',
-    };
-  }
-}
-
-export async function getMyParticipationForActivity(activityId: string) {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) return { success: true, data: null };
-
-    const { data, error } = await admin()
-      .from('participations')
-      .select('*')
-      .eq('activity_id', activityId)
-      .eq('user_id', currentUser.id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return { success: true, data: data as Participation | null };
-  } catch (err) {
-    console.error('Erreur getMyParticipationForActivity:', err);
-    return {
-      success: false,
-      error: 'Impossible de vérifier ta participation.',
-    };
-  }
-}
+// -----------------------------------------------------------------------------
+// Participations
+// -----------------------------------------------------------------------------
 
 // Notifie l'organisateur qu'un utilisateur demande à rejoindre sa sortie.
 // La notification (type participation_request) s'affiche sur la cloche et
@@ -347,113 +366,115 @@ async function notifyOrganizerOfRequest(
   });
 }
 
-export async function requestParticipation(activityId: string) {
+export async function requestParticipation(activityId: string): Promise<ActionResult> {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) return authError();
+    if (!isValidUuid(activityId)) return fail('Sortie introuvable.');
 
-    const activityResult = await getActivityById(activityId);
-    if (!activityResult.success || !activityResult.data) {
-      return { success: false, error: 'Sortie introuvable.' };
+    const activity = await getActivityByIdFromDb(activityId);
+    if (!activity) return fail('Sortie introuvable.');
+    if (activity.organizer_id === currentUser.id) {
+      return fail("Tu es déjà l'organisateur de cette sortie.");
+    }
+    if (!isOpen(activity)) {
+      return fail("Cette sortie n'accepte plus de demandes.");
     }
 
-    if (activityResult.data.organizer_id === currentUser.id) {
-      return {
-        success: false,
-        error: "Tu es déjà l'organisateur de cette sortie.",
-      };
-    }
+    // % de match affiché au moment de la demande : donnée d'entraînement du
+    // futur modèle de matching (cf. CLAUDE.md).
+    const matchMap = await getMatchPercentages(currentUser, [activity]);
+    const matchLog = {
+      match_percentage: matchMap[activity.id] ?? null,
+      matching_version: MATCHING_VERSION,
+    };
 
-    const existing = await getMyParticipationForActivity(activityId);
-    if (existing.data) {
-      if (existing.data.status === 'pending') {
-        return { success: false, error: 'Ta demande est déjà en attente.' };
-      }
-      if (existing.data.status === 'approved') {
-        return { success: false, error: 'Tu participes déjà à cette sortie.' };
-      }
-      if (existing.data.status === 'rejected') {
-        const { error } = await admin()
-          .from('participations')
-          .update({ status: 'pending' })
-          .eq('id', existing.data.id);
-        if (error) throw error;
+    const existing = await getUserParticipation(activityId, currentUser.id);
+    if (existing?.status === 'pending') return fail('Ta demande est déjà en attente.');
+    if (existing?.status === 'approved') return fail('Tu participes déjà à cette sortie.');
 
-        await notifyOrganizerOfRequest(
-          activityResult.data,
-          currentUser.name,
-          existing.data.id
-        );
-
-        revalidatePath(`/activities/${activityId}`);
-        revalidatePath('/activities');
-        revalidatePath('/', 'layout');
-        return { success: true };
-      }
-    }
-
-    const { data: inserted, error } = await admin()
-      .from('participations')
-      .insert([
-        {
+    let participationId: string;
+    if (existing?.status === 'rejected') {
+      const { error } = await admin()
+        .from('participations')
+        .update({ status: 'pending', ...matchLog })
+        .eq('id', existing.id)
+        .eq('status', 'rejected');
+      if (error) throw error;
+      participationId = existing.id;
+    } else {
+      const { data: inserted, error } = await admin()
+        .from('participations')
+        .insert({
           user_id: currentUser.id,
           activity_id: activityId,
           status: 'pending',
-        },
-      ])
-      .select('id')
-      .single();
+          ...matchLog,
+        })
+        .select('id')
+        .single();
+      if (error?.code === UNIQUE_VIOLATION) return fail('Ta demande est déjà en attente.');
+      if (error) throw error;
+      participationId = inserted.id;
+    }
 
-    if (error) throw error;
+    await notifyOrganizerOfRequest(activity, currentUser.name, participationId);
 
-    await notifyOrganizerOfRequest(
-      activityResult.data,
-      currentUser.name,
-      inserted.id
-    );
-
-    revalidatePath(`/activities/${activityId}`);
-    revalidatePath('/activities');
+    revalidateActivity(activityId);
     revalidatePath('/', 'layout');
     return { success: true };
   } catch (err) {
     console.error('Erreur requestParticipation:', err);
-    return { success: false, error: "Impossible d'envoyer la demande." };
+    return fail("Impossible d'envoyer la demande.");
   }
 }
+
+const participationDecisionSchema = z.enum(['approved', 'rejected']);
 
 export async function updateParticipationStatus(
   participationId: string,
   status: 'approved' | 'rejected'
-) {
+): Promise<ActionResult> {
   try {
-    const currentUser = await requireAuth();
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return authError();
+    if (!isValidUuid(participationId)) return fail('Demande introuvable.');
+    if (!participationDecisionSchema.safeParse(status).success) {
+      return fail('Action non autorisée.');
+    }
 
     const { data: participation, error: fetchError } = await admin()
       .from('participations')
-      .select('*, activities(organizer_id, title)')
+      .select('id, user_id, activity_id, status, activities(organizer_id, title, status)')
       .eq('id', participationId)
-      .single();
+      .maybeSingle();
 
-    if (fetchError || !participation) {
-      return { success: false, error: 'Demande introuvable.' };
-    }
+    if (fetchError || !participation) return fail('Demande introuvable.');
 
-    const activityInfo = participation.activities as {
+    const activityInfo = participation.activities as unknown as {
       organizer_id: string;
       title: string;
-    };
+      status: string;
+    } | null;
 
     if (activityInfo?.organizer_id !== currentUser.id) {
-      return { success: false, error: 'Action non autorisée.' };
+      return fail('Action non autorisée.');
+    }
+    if (activityInfo.status === 'cancelled') {
+      return fail('Cette sortie a été annulée.');
     }
 
-    const { error } = await admin()
+    const { data: updated, error } = await admin()
       .from('participations')
       .update({ status })
-      .eq('id', participationId);
+      .eq('id', participationId)
+      .eq('status', 'pending')
+      .select('id');
 
     if (error) throw error;
+    if (!updated || updated.length === 0) {
+      return fail('Cette demande a déjà été traitée.');
+    }
 
     // La demande d'acceptation a été traitée : on retire la notification
     // "participation_request" de la cloche de l'organisateur.
@@ -470,309 +491,115 @@ export async function updateParticipationStatus(
       link: `/activities/${participation.activity_id}`,
     });
 
-    revalidatePath(`/activities/${participation.activity_id}`);
-    revalidatePath('/activities');
+    revalidateActivity(participation.activity_id);
     revalidatePath('/', 'layout');
     return { success: true };
   } catch (err) {
     console.error('Erreur updateParticipationStatus:', err);
-    return {
-      success: false,
-      error: 'Impossible de mettre à jour la demande.',
-    };
+    return fail('Impossible de mettre à jour la demande.');
   }
 }
 
-export async function getApprovedParticipantsForActivities(
-  activityIds: string[]
-) {
-  if (activityIds.length === 0) return {};
+// -----------------------------------------------------------------------------
+// Messages
+// -----------------------------------------------------------------------------
 
-  try {
-    const { data, error } = await admin()
-      .from('participations')
-      .select('*')
-      .in('activity_id', activityIds)
-      .eq('status', 'approved');
-
-    if (error) throw error;
-
-    const enriched = await enrichParticipations(data as Participation[]);
-    const map: Record<string, ParticipationWithUser[]> = {};
-    for (const p of enriched) {
-      if (!map[p.activity_id]) map[p.activity_id] = [];
-      map[p.activity_id].push(p);
-    }
-    return map;
-  } catch (err) {
-    console.error('Erreur getApprovedParticipantsForActivities:', err);
-    return {};
-  }
-}
-
-export async function getMatchPercentagesForActivities(
-  activities: Pick<Activity, 'id' | 'organizer_id' | 'type'>[]
-): Promise<Record<string, number>> {
-  try {
-    const viewer = await getCurrentUser();
-    if (!viewer) return {};
-
-    const organizerIds = Array.from(
-      new Set(activities.map((a) => a.organizer_id))
-    );
-    const allUserIds = Array.from(new Set([viewer.id, ...organizerIds]));
-
-    const [profilesByUser, geoProfiles] = await Promise.all([
-      getPerformanceProfilesForUsers(allUserIds),
-      getUsersByIds(allUserIds),
-    ]);
-
-    const geoMap = new Map(geoProfiles.map((p) => [p.id, p]));
-    const viewerGeo = geoMap.get(viewer.id) ?? {};
-    const viewerFamilies = new Map(
-      (profilesByUser[viewer.id] ?? []).map((p) => [p.sportFamily, p])
-    );
-
-    const map: Record<string, number> = {};
-    for (const act of activities) {
-      if (act.organizer_id === viewer.id) continue;
-
-      const organizerFamilies = new Map(
-        (profilesByUser[act.organizer_id] ?? []).map((p) => [p.sportFamily, p])
-      );
-      const pct = computeMatchPercentage(
-        viewerFamilies.get(act.type as ActivityType),
-        organizerFamilies.get(act.type as ActivityType),
-        viewerGeo,
-        geoMap.get(act.organizer_id) ?? {}
-      );
-      if (pct !== null) map[act.id] = pct;
-    }
-
-    return map;
-  } catch (err) {
-    console.error('Erreur getMatchPercentagesForActivities:', err);
-    return {};
-  }
-}
-
-export async function getActivityDistances(
-  activities: Pick<Activity, 'id' | 'latitude' | 'longitude'>[]
-): Promise<Record<string, number>> {
-  try {
-    const viewer = await getCurrentUser();
-    if (!viewer || viewer.latitude == null || viewer.longitude == null) {
-      return {};
-    }
-
-    const map: Record<string, number> = {};
-    for (const act of activities) {
-      if (act.latitude == null || act.longitude == null) continue;
-      const km = haversineDistanceKm(
-        viewer.latitude,
-        viewer.longitude,
-        act.latitude,
-        act.longitude
-      );
-      map[act.id] = Math.round(km * 10) / 10;
-    }
-
-    return map;
-  } catch (err) {
-    console.error('Erreur getActivityDistances:', err);
-    return {};
-  }
-}
-
-export async function signOutAction() {
-  await signOut({ redirectTo: '/' });
-}
-
-export async function deleteAccountAction() {
-  let currentUser;
-  try {
-    currentUser = await requireAuth();
-  } catch {
-    return { success: false, error: 'Non authentifié.' };
-  }
-
-  const { error } = await admin().from('profiles').delete().eq('id', currentUser.id);
-  if (error) {
-    console.error('Erreur deleteAccountAction:', error);
-    return { success: false, error: 'Impossible de supprimer ton compte.' };
-  }
-
-  // Les activites, participations, messages, notifications, tokens Strava et
-  // profils de performance de l'utilisateur sont supprimes en cascade par
-  // les contraintes de cle etrangere definies dans les migrations.
-  await signOut({ redirectTo: '/' });
-}
-
-export async function getCurrentUserAction() {
-  const user = await getCurrentUser();
-  if (!user) return { success: false, error: 'Non authentifié' };
-  return { success: true, data: user };
-}
-
-export async function updateProfileLocation(params: {
-  city: string;
-  country: string | null;
-  latitude: number;
-  longitude: number;
-}) {
-  try {
-    const currentUser = await requireAuth();
-
-    const { error } = await admin()
-      .from('profiles')
-      .update({
-        city: params.city,
-        country: params.country,
-        latitude: params.latitude,
-        longitude: params.longitude,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', currentUser.id);
-
-    if (error) throw error;
-
-    revalidatePath('/profile');
-    return { success: true };
-  } catch (err) {
-    console.error('Erreur updateProfileLocation:', err);
-    return { success: false, error: "Impossible de mettre à jour ta ville." };
-  }
-}
-
-function formatMessageTime(dateStr: string) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  if (isToday) {
-    return date.toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return 'Hier';
-  return date.toLocaleDateString('fr-FR', { weekday: 'short' });
-}
-
-export async function getConversations() {
+export async function getConversation(
+  contactId: string
+): Promise<ActionResult<Message[]>> {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) return authError();
+    if (!isValidUserId(contactId) || contactId === currentUser.id) {
+      return fail('Conversation introuvable.');
+    }
+
+    const messages = await getConversationMessages(currentUser.id, contactId);
+
+    // Rafraîchit le badge "Messages" de la barre de navigation uniquement s'il
+    // y avait des messages non lus (cette action est appelée en boucle).
+    const markedAsRead = await markConversationAsRead(currentUser.id, contactId);
+    if (markedAsRead > 0) revalidatePath('/', 'layout');
+
+    return { success: true, data: messages };
+  } catch (err) {
+    console.error('Erreur getConversation:', err);
+    return fail('Impossible de charger les messages.');
+  }
+}
+
+export async function sendMessage(
+  receiverId: string,
+  content: string
+): Promise<ActionResult<Message>> {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return authError();
+    if (!isValidUserId(receiverId) || receiverId === currentUser.id) {
+      return fail('Destinataire invalide.');
+    }
+
+    const parsed = messageContentSchema.safeParse(content);
+    if (!parsed.success) return fail(firstErrorMessage(parsed.error));
+
+    if (!(await getUserById(receiverId))) return fail('Destinataire introuvable.');
+    if (await isRateLimited('messages', currentUser.id)) {
+      return fail('Tu envoies trop de messages, patiente une minute.');
+    }
 
     const { data, error } = await admin()
       .from('messages')
-      .select('*')
-      .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-      .order('created_at', { ascending: false });
+      .insert({
+        sender_id: currentUser.id,
+        sender_name: currentUser.name,
+        sender_avatar: currentUser.avatar,
+        receiver_id: receiverId,
+        content: parsed.data,
+      })
+      .select('id, created_at, sender_id, sender_name, sender_avatar, receiver_id, content')
+      .single();
 
     if (error) throw error;
-
-    const seen = new Set<string>();
-    const conversations: ConversationPreview[] = [];
-
-    for (const msg of data ?? []) {
-      const contactId =
-        msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id;
-      if (seen.has(contactId)) continue;
-      seen.add(contactId);
-
-      conversations.push({
-        contactId,
-        contactName: await getUserName(contactId),
-        contactAvatar: await getUserAvatar(contactId),
-        lastMessage: msg.content,
-        time: formatMessageTime(msg.created_at),
-      });
-    }
-
-    return { success: true, data: conversations };
+    return { success: true, data: data as Message };
   } catch (err) {
-    console.error('Erreur getConversations:', err);
-    return { success: false, error: 'Impossible de charger les messages.' };
+    console.error('Erreur sendMessage:', err);
+    return fail("Impossible d'envoyer le message.");
   }
 }
 
-export async function getContactProfileAction(contactId: string) {
-  const profile = await getUsersByIds([contactId]);
-  const user = profile[0] as Profile | undefined;
-  return {
-    success: true,
-    data: {
-      name: user?.name ?? 'Utilisateur',
-      avatar:
-        user?.avatar_url ??
-        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=100',
-    },
-  };
-}
+// -----------------------------------------------------------------------------
+// Retour sur le matching et signalements
+// -----------------------------------------------------------------------------
 
-export async function getNotifications() {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) return authError();
-
-    const data = await getNotificationsForUser(currentUser.id);
-    return { success: true, data };
-  } catch (err) {
-    console.error('Erreur getNotifications:', err);
-    return { success: false, error: 'Impossible de charger les notifications.' };
-  }
-}
-
-export async function getNavBadgesAction() {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) {
-    return { unreadMessages: 0, unreadNotifications: 0 };
-  }
-
-  // La cloche regroupe désormais les demandes d'acceptation de sortie ET les
-  // réponses (participation validée / refusée) : ce sont toutes des lignes
-  // non lues de la table notifications.
-  const [unreadMessages, unreadNotifications] = await Promise.all([
-    getUnreadConversationsCount(currentUser.id),
-    getUnreadNotificationCount(currentUser.id),
-  ]);
-
-  return { unreadMessages, unreadNotifications };
-}
-
-// Appelé à l'ouverture de la page Notifications : les réponses à une demande de
-// participation (acceptée / refusée) disparaissent de la cloche. Les demandes
-// d'acceptation de sortie restent, elles, jusqu'à ce qu'on accepte ou refuse.
-// (Marquage seul, sans revalidate : appelé pendant le rendu de la page.)
-export async function getNotificationsAndMarkResponsesRead() {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) return authError();
-
-    const data = await getNotificationsForUser(currentUser.id);
-    await markResponseNotificationsAsRead(currentUser.id);
-    return { success: true, data };
-  } catch (err) {
-    console.error('Erreur getNotificationsAndMarkResponsesRead:', err);
-    return { success: false, error: 'Impossible de charger les notifications.' };
-  }
-}
-
+/**
+ * Après une sortie, un participant accepté indique si le % de matching avec
+ * l'organisateur correspondait à la réalité. La personne notée est toujours
+ * l'organisateur (déterminé côté serveur, jamais fourni par le client).
+ */
 export async function submitMatchFeedback(
   activityId: string,
-  ratedId: string,
   accurate: boolean
-) {
+): Promise<ActionResult> {
   try {
-    const currentUser = await requireAuth();
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return authError();
+    if (!isValidUuid(activityId) || typeof accurate !== 'boolean') {
+      return fail('Données invalides.');
+    }
+
+    const activity = await getActivityByIdFromDb(activityId);
+    if (!activity || activity.status === 'cancelled' || !isPast(activity)) {
+      return fail("Le retour n'est possible qu'après la sortie.");
+    }
+
+    const participation = await getUserParticipation(activityId, currentUser.id);
+    if (participation?.status !== 'approved') return fail('Action non autorisée.');
 
     const { error } = await admin().from('match_feedback').upsert(
       {
         activity_id: activityId,
         rater_id: currentUser.id,
-        rated_id: ratedId,
+        rated_id: activity.organizer_id,
         accurate,
       },
       { onConflict: 'activity_id,rater_id' }
@@ -782,27 +609,7 @@ export async function submitMatchFeedback(
     return { success: true };
   } catch (err) {
     console.error('Erreur submitMatchFeedback:', err);
-    return { success: false, error: "Impossible d'enregistrer ton retour." };
-  }
-}
-
-export async function getMyMatchFeedback(activityId: string) {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) return { success: true, data: null };
-
-    const { data, error } = await admin()
-      .from('match_feedback')
-      .select('accurate')
-      .eq('activity_id', activityId)
-      .eq('rater_id', currentUser.id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return { success: true, data };
-  } catch (err) {
-    console.error('Erreur getMyMatchFeedback:', err);
-    return { success: true, data: null };
+    return fail("Impossible d'enregistrer ton retour.");
   }
 }
 
@@ -811,28 +618,134 @@ export async function reportUser(params: {
   reportedId: string;
   reason: string;
   description?: string;
-}) {
+}): Promise<ActionResult> {
   try {
-    const currentUser = await requireAuth();
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return authError();
 
-    if (params.reportedId === currentUser.id) {
-      return { success: false, error: 'Action non autorisée.' };
+    const parsed = reportSchema.safeParse(params);
+    if (!parsed.success) return fail(firstErrorMessage(parsed.error));
+    if (parsed.data.reportedId === currentUser.id) return fail('Action non autorisée.');
+
+    if (!(await getUserById(parsed.data.reportedId))) {
+      return fail('Utilisateur introuvable.');
+    }
+    if (await isRateLimited('reports', currentUser.id)) {
+      return fail("Tu as envoyé beaucoup de signalements aujourd'hui.");
     }
 
-    const { error } = await admin().from('user_reports').insert([
-      {
-        activity_id: params.activityId ?? null,
-        reporter_id: currentUser.id,
-        reported_id: params.reportedId,
-        reason: params.reason,
-        description: params.description ?? null,
-      },
-    ]);
+    const { error } = await admin().from('user_reports').insert({
+      activity_id: parsed.data.activityId ?? null,
+      reporter_id: currentUser.id,
+      reported_id: parsed.data.reportedId,
+      reason: parsed.data.reason,
+      description: parsed.data.description,
+    });
 
     if (error) throw error;
     return { success: true };
   } catch (err) {
     console.error('Erreur reportUser:', err);
-    return { success: false, error: "Impossible d'envoyer le signalement." };
+    return fail("Impossible d'envoyer le signalement.");
   }
+}
+
+// -----------------------------------------------------------------------------
+// Profil, lieux enregistrés, compte
+// -----------------------------------------------------------------------------
+
+const profileLocationSchema = z.object({
+  city: z.string().trim().min(1).max(120),
+  country: z.string().trim().max(120).nullable(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+
+export async function updateProfileLocation(params: {
+  city: string;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+}): Promise<ActionResult> {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return authError();
+
+    const parsed = profileLocationSchema.safeParse(params);
+    if (!parsed.success) return fail('Position invalide.');
+
+    const { error } = await admin()
+      .from('profiles')
+      .update(parsed.data)
+      .eq('id', currentUser.id);
+
+    if (error) throw error;
+
+    revalidatePath('/profile');
+    revalidatePath('/settings');
+    revalidatePath('/');
+    return { success: true };
+  } catch (err) {
+    console.error('Erreur updateProfileLocation:', err);
+    return fail('Impossible de mettre à jour ta ville.');
+  }
+}
+
+export async function renameSavedPlaceAction(
+  placeId: string,
+  name: string
+): Promise<ActionResult> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return authError();
+  if (!isValidUuid(placeId)) return fail('Lieu introuvable.');
+
+  const parsed = placeNameSchema.safeParse(name);
+  if (!parsed.success) return fail(firstErrorMessage(parsed.error));
+
+  const result = await renameSavedPlace(currentUser.id, placeId, parsed.data);
+  if (!result.success) return fail(result.error ?? 'Impossible de renommer ce lieu.');
+
+  revalidatePath('/settings');
+  return { success: true };
+}
+
+export async function deleteSavedPlaceAction(placeId: string): Promise<ActionResult> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return authError();
+  if (!isValidUuid(placeId)) return fail('Lieu introuvable.');
+
+  const result = await deleteSavedPlace(currentUser.id, placeId);
+  if (!result.success) return fail(result.error ?? 'Impossible de supprimer ce lieu.');
+
+  revalidatePath('/settings');
+  return { success: true };
+}
+
+export async function signOutAction() {
+  await signOut({ redirectTo: '/' });
+}
+
+export async function deleteAccountAction(): Promise<ActionResult | void> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return fail('Non authentifié.');
+
+  // Révocation de l'accès Strava (au mieux : la suppression du compte ne doit
+  // pas échouer si Strava ne répond pas).
+  try {
+    const accessToken = await getValidStravaAccessToken(currentUser.id);
+    if (accessToken) await deauthorizeStrava(accessToken);
+  } catch (err) {
+    console.error('Erreur révocation Strava (suppression de compte):', err);
+  }
+
+  const { error } = await admin().from('profiles').delete().eq('id', currentUser.id);
+  if (error) {
+    console.error('Erreur deleteAccountAction:', error);
+    return fail('Impossible de supprimer ton compte.');
+  }
+
+  // Les activités, participations, messages, notifications, lieux, tokens
+  // Strava et profils de performance de l'utilisateur sont supprimés en
+  // cascade par les contraintes de clé étrangère.
+  await signOut({ redirectTo: '/' });
 }

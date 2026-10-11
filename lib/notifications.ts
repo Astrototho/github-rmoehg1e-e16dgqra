@@ -1,28 +1,38 @@
 import { createAdminClient } from '@/lib/supabase-admin';
 import type { Notification, NotificationType } from '@/lib/types';
 
-export async function createNotification(params: {
+interface NewNotification {
   userId: string;
   type: NotificationType;
   title: string;
   body: string;
   link?: string;
   relatedId?: string;
-}) {
-  const { error } = await createAdminClient().from('notifications').insert([
-    {
-      user_id: params.userId,
-      type: params.type,
-      title: params.title,
-      body: params.body,
-      link: params.link ?? null,
-      related_id: params.relatedId ?? null,
-    },
-  ]);
+}
+
+export async function createNotifications(notifications: NewNotification[]) {
+  if (notifications.length === 0) return;
+
+  const { error } = await createAdminClient()
+    .from('notifications')
+    .insert(
+      notifications.map((n) => ({
+        user_id: n.userId,
+        type: n.type,
+        title: n.title,
+        body: n.body,
+        link: n.link ?? null,
+        related_id: n.relatedId ?? null,
+      }))
+    );
 
   if (error) {
-    console.error('Erreur createNotification:', error);
+    console.error('Erreur createNotifications:', error);
   }
+}
+
+export async function createNotification(notification: NewNotification) {
+  await createNotifications([notification]);
 }
 
 export async function getNotificationsForUser(
@@ -60,15 +70,20 @@ export async function getUnreadNotificationCount(
   return count ?? 0;
 }
 
-// Réponses à une demande de participation (acceptée / refusée).
-// Ces notifications disparaissent dès que la page Notifications est ouverte.
+// Notifications purement informatives (réponse à une demande, sortie modifiée
+// ou annulée) : elles disparaissent dès que la page Notifications est ouverte.
 export async function markResponseNotificationsAsRead(userId: string) {
   const { error } = await createAdminClient()
     .from('notifications')
     .update({ is_read: true })
     .eq('user_id', userId)
     .eq('is_read', false)
-    .in('type', ['participation_approved', 'participation_rejected']);
+    .in('type', [
+      'participation_approved',
+      'participation_rejected',
+      'activity_updated',
+      'activity_cancelled',
+    ]);
 
   if (error) {
     console.error('Erreur markResponseNotificationsAsRead:', error);
@@ -77,11 +92,14 @@ export async function markResponseNotificationsAsRead(userId: string) {
 
 // Notification "demande d'acceptation de sortie" liée à une participation.
 // Elle disparaît dès que l'organisateur accepte ou refuse la demande.
-export async function markNotificationsByRelatedId(relatedId: string) {
+export async function markNotificationsByRelatedId(relatedId: string | string[]) {
+  const ids = Array.isArray(relatedId) ? relatedId : [relatedId];
+  if (ids.length === 0) return;
+
   const { error } = await createAdminClient()
     .from('notifications')
     .update({ is_read: true })
-    .eq('related_id', relatedId)
+    .in('related_id', ids)
     .eq('is_read', false);
 
   if (error) {

@@ -57,3 +57,58 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Mobile                                                                      */
+/* -------------------------------------------------------------------------- */
+
+@layer utilities {
+  /* Zones sûres (encoche, barre d'accueil iPhone) — actives grâce à
+     viewport-fit=cover dans app/layout.tsx. */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* Espace réservé sous le contenu pour la barre de navigation du bas. */
+  .pb-nav {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+  /* Sous-en-têtes collants, juste sous la barre supérieure (h-14). */
+  .top-header {
+    top: calc(3.5rem + env(safe-area-inset-top, 0px));
+  }
+  /* Bouton d'action collant, juste au-dessus de la barre de navigation. */
+  .bottom-nav-offset {
+    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  .hide-scrollbar {
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* iOS zoome automatiquement sur un champ dont la police fait moins de 16 px :
+   on force 16 px sur téléphone, quelle que soit la classe utilisée. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Pas de surbrillance grise au toucher sur iOS / Android. */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Les cartes Leaflet ne doivent pas passer au-dessus des en-têtes / modales. */
+.leaflet-container {
+  z-index: 0;
+  font: inherit;
+}

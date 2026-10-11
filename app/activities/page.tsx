@@ -1,123 +1,63 @@
-'use client';
+import { redirect } from 'next/navigation';
+import MyActivitiesTabs, { type MyActivityItem } from '@/components/MyActivitiesTabs';
+import { ACTIVITY_COLUMNS, getActivitiesByOrganizer } from '@/lib/activities';
+import { getCurrentUser } from '@/lib/session';
+import { createAdminClient } from '@/lib/supabase-admin';
+import { isCancelled, isPast } from '@/lib/activity-rules';
+import type { Activity } from '@/lib/types';
 
-import { useState, useEffect } from 'react';
-import ActivityCard, { Activity } from '@/components/ActivityCard';
-import { getMyActivities } from '@/app/actions';
+export const dynamic = 'force-dynamic';
 
-type TabType = 'en-cours' | 'validees' | 'mes-sorties' | 'passees';
+type ParticipationRow = { status: string; activities: Activity | null };
 
-export default function ActivitiesPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('mes-sorties');
-  
-  // Nouveaux états pour stocker les vraies données et gérer le chargement
-  const [activitiesData, setActivitiesData] = useState<Record<TabType, Activity[]> | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+const byStartAsc = (a: MyActivityItem, b: MyActivityItem) =>
+  new Date(a.activity.start_date).getTime() - new Date(b.activity.start_date).getTime();
 
-  // useEffect se lance tout seul au chargement de la page
-  useEffect(() => {
-    async function loadActivities() {
-      setIsLoading(true);
-      const result = await getMyActivities();
-      
-      if (result.success && result.data) {
-        // On force le typage ici pour que TypeScript soit content
-        setActivitiesData(result.data as unknown as Record<TabType, Activity[]>);
-      } else {
-        alert(result.error || "Erreur de chargement");
-      }
-      setIsLoading(false);
-    }
+export default async function ActivitiesPage() {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect('/login');
 
-    loadActivities();
-  }, []); // Le tableau vide [] signifie "ne le faire qu'une seule fois au début"
+  const [organized, participationsResult] = await Promise.all([
+    getActivitiesByOrganizer(currentUser.id),
+    createAdminClient()
+      .from('participations')
+      .select(`status, activities (${ACTIVITY_COLUMNS})`)
+      .eq('user_id', currentUser.id),
+  ]);
 
-  // Si on charge, on affiche un message d'attente
-  if (isLoading || !activitiesData) {
-    return (
-      <div className="flex flex-col h-full bg-gray-50 items-center justify-center pt-20">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-500 font-medium">Chargement de tes sorties...</p>
-      </div>
-    );
+  if (participationsResult.error) {
+    throw new Error('Impossible de charger tes participations.');
   }
 
-  // On récupère la bonne liste en fonction de l'onglet cliqué
-  const currentActivities = activitiesData[activeTab];
+  const now = Date.now();
+  const participations = (participationsResult.data ?? []) as unknown as ParticipationRow[];
+  const isUpcoming = (a: Activity) => !isCancelled(a) && !isPast(a, now);
 
-  return (
-    <div className="flex flex-col h-full bg-gray-50">
-      {/* En-tête */}
-      <div className="px-4 py-6 bg-white border-b">
-        <h1 className="text-2xl font-black text-gray-900">Mes Sorties</h1>
-        <p className="text-gray-500 text-sm mt-1">Gère ton planning sportif</p>
-      </div>
+  const tabs = {
+    'mes-sorties': organized
+      .filter(isUpcoming)
+      .map((activity) => ({ activity }))
+      .sort(byStartAsc),
+    validees: participations
+      .filter((p) => p.status === 'approved' && p.activities && isUpcoming(p.activities))
+      .map((p) => ({ activity: p.activities!, badge: { label: 'Validée', tone: 'success' as const } }))
+      .sort(byStartAsc),
+    'en-cours': participations
+      .filter((p) => p.status === 'pending' && p.activities && isUpcoming(p.activities))
+      .map((p) => ({ activity: p.activities!, badge: { label: 'En attente', tone: 'warning' as const } }))
+      .sort(byStartAsc),
+    passees: [
+      ...organized
+        .filter((a) => !isUpcoming(a))
+        .map((activity) => ({
+          activity,
+          badge: { label: 'Organisée', tone: 'neutral' as const },
+        })),
+      ...participations
+        .filter((p) => p.status === 'approved' && p.activities && !isUpcoming(p.activities))
+        .map((p) => ({ activity: p.activities! })),
+    ].sort((a, b) => byStartAsc(b, a)),
+  } satisfies Record<string, MyActivityItem[]>;
 
-      {/* Navigation par onglets */}
-      <div className="bg-white border-b sticky top-14 z-40">
-        <div className="flex overflow-x-auto hide-scrollbar px-2">
-          <button
-            onClick={() => setActiveTab('mes-sorties')}
-            className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
-              activeTab === 'mes-sorties'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Mes sorties
-          </button>
-          <button
-            onClick={() => setActiveTab('validees')}
-            className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
-              activeTab === 'validees'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Validées
-          </button>
-          <button
-            onClick={() => setActiveTab('en-cours')}
-            className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
-              activeTab === 'en-cours'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            En attente
-          </button>
-          <button
-            onClick={() => setActiveTab('passees')}
-            className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
-              activeTab === 'passees'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Historique
-          </button>
-        </div>
-      </div>
-
-      {/* Liste des cartes */}
-      <div className="p-4 space-y-4 flex-1 overflow-y-auto">
-        {currentActivities && currentActivities.length > 0 ? (
-          currentActivities.map((activity) => (
-            <ActivityCard
-              key={activity.id}
-              activity={activity}
-              href={`/activities/${activity.id}`}
-            />
-          ))
-        ) : (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-3">📭</div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Aucune sortie ici</h3>
-            <p className="text-gray-500 text-sm">
-              Il n&apos;y a rien à afficher dans cette catégorie pour le moment.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <MyActivitiesTabs tabs={tabs} />;
 }

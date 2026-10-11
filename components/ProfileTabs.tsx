@@ -3,12 +3,16 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { List, Map } from 'lucide-react';
+import LeafletMap from '@/components/maps/LeafletMap';
+import { getSportEmoji } from '@/lib/sports';
+import { formatDayMonth } from '@/lib/dates';
 
 interface ProfileActivity {
   id: string;
   title: string;
   type: string;
   start_date: string;
+  status?: string;
 }
 
 interface ProfileTabsProps {
@@ -19,14 +23,6 @@ interface ProfileTabsProps {
   longitude?: number | null;
 }
 
-const sportEmojis: Record<string, string> = {
-  trail: '⛰️',
-  'course-a-pied': '🏃',
-  'velo-route': '🚴',
-  velo: '🚴',
-  vtt: '🚵',
-};
-
 export default function ProfileTabs({
   activities,
   city,
@@ -35,15 +31,11 @@ export default function ProfileTabs({
   longitude,
 }: ProfileTabsProps) {
   const [tab, setTab] = useState<'sorties' | 'carte'>('sorties');
-
-  const mapQuery =
-    latitude != null && longitude != null
-      ? `${latitude},${longitude}`
-      : [city, country].filter(Boolean).join(', ');
+  const hasCoords = latitude != null && longitude != null;
 
   return (
     <>
-      <div className="sticky top-14 bg-white border-b border-gray-100 z-30">
+      <div className="sticky top-header bg-white border-b border-gray-100 z-30">
         <div className="flex gap-6 px-4 text-sm font-medium">
           <button
             onClick={() => setTab('sorties')}
@@ -85,17 +77,14 @@ export default function ProfileTabs({
                 href={`/activities/${activity.id}`}
                 className="relative aspect-square overflow-hidden bg-primary/10 flex flex-col items-center justify-center p-2 hover:bg-primary/20 transition-colors"
               >
-                <span className="text-2xl mb-1">
-                  {sportEmojis[activity.type] ?? '🏅'}
-                </span>
+                <span className="text-2xl mb-1">{getSportEmoji(activity.type)}</span>
                 <span className="text-[11px] font-semibold text-gray-900 text-center line-clamp-2">
                   {activity.title}
                 </span>
                 <span className="text-[10px] text-gray-500 mt-0.5">
-                  {new Date(activity.start_date).toLocaleDateString('fr-FR', {
-                    day: 'numeric',
-                    month: 'short',
-                  })}
+                  {activity.status === 'cancelled'
+                    ? 'Annulée'
+                    : formatDayMonth(activity.start_date)}
                 </span>
               </Link>
             ))}
@@ -103,14 +92,17 @@ export default function ProfileTabs({
         )
       ) : (
         <div className="p-4">
-          {mapQuery ? (
-            <div className="aspect-square w-full rounded-xl overflow-hidden border border-gray-100">
-              <iframe
-                title="Carte de localisation"
-                src={`https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`}
-                className="w-full h-full border-0"
-                loading="lazy"
-              />
+          {hasCoords ? (
+            <div className="space-y-2">
+              <div className="relative z-0 aspect-square w-full overflow-hidden rounded-xl border border-gray-100">
+                <LeafletMap latitude={Number(latitude)} longitude={Number(longitude)} zoom={12} />
+              </div>
+              {city && (
+                <p className="text-center text-sm text-gray-600">
+                  {city}
+                  {country ? `, ${country}` : ''}
+                </p>
+              )}
             </div>
           ) : (
             <div className="text-center py-16 px-4">

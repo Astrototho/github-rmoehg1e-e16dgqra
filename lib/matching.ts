@@ -1,5 +1,11 @@
 import type { SportFamilyIndices } from '@/lib/performance';
 
+// Version de la formule : enregistrée avec chaque demande de participation
+// (participations.matching_version) pour relier les retours terrain à la
+// formule qui a produit le % affiché. À incrémenter à chaque changement de
+// poids ou de calcul.
+export const MATCHING_VERSION = 'v1-equal-weights';
+
 // Poids égaux par défaut faute d'indication contraire — isolés pour être
 // ajustables sans toucher au reste du calcul.
 const WEIGHTS = { speed: 0.25, duration: 0.25, elevation: 0.25, chill: 0.25 };
