@@ -4,6 +4,7 @@ import type { MetadataRoute } from 'next';
 // d'accueil ») et l'ouvre en plein écran, sans barre de navigateur.
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: '/',
     name: 'PerfConnect',
     short_name: 'PerfConnect',
     description: 'Trouve ton partenaire de sport',
@@ -14,6 +15,12 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: 'portrait',
     background_color: '#ffffff',
     theme_color: '#ffffff',
+    categories: ['sports', 'social', 'health'],
+    shortcuts: [
+      { name: 'Proposer une sortie', short_name: 'Proposer', url: '/create' },
+      { name: 'Messages', url: '/messages' },
+      { name: 'Mes sorties', url: '/activities' },
+    ],
     icons: [
       { src: '/icon/192', sizes: '192x192', type: 'image/png' },
       { src: '/icon/512', sizes: '512x512', type: 'image/png' },

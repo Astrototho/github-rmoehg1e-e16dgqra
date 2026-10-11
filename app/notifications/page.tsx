@@ -15,6 +15,7 @@ import {
   markResponseNotificationsAsRead,
 } from '@/lib/notifications';
 import { formatRelativeDay } from '@/lib/dates';
+import PushNotificationsToggle from '@/components/PushNotificationsToggle';
 import type { Notification, NotificationType } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,8 @@ export default async function NotificationsPage() {
         <h1 className="text-2xl font-black text-gray-900">Notifications</h1>
         <p className="text-gray-500 text-sm mt-1">Demandes et réponses</p>
       </div>
+
+      <PushNotificationsToggle compact />
 
       <div className="flex-1 overflow-y-auto">
         {notifications.length === 0 ? (

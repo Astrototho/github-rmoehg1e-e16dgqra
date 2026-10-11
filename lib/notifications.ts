@@ -1,4 +1,6 @@
 import { createAdminClient } from '@/lib/supabase-admin';
+import { runInBackground } from '@/lib/background';
+import { sendPushToUsers } from '@/lib/push';
 import type { Notification, NotificationType } from '@/lib/types';
 
 interface NewNotification {
@@ -28,7 +30,23 @@ export async function createNotifications(notifications: NewNotification[]) {
 
   if (error) {
     console.error('Erreur createNotifications:', error);
+    return;
   }
+
+  // Même contenu en notification push sur les téléphones abonnés, envoyé
+  // après la réponse pour ne pas ralentir l'action de l'utilisateur.
+  runInBackground('notifications push', () =>
+    Promise.all(
+      notifications.map((n) =>
+        sendPushToUsers([n.userId], {
+          title: n.title,
+          body: n.body,
+          url: n.link ?? '/notifications',
+          tag: n.relatedId ? `${n.type}-${n.relatedId}` : undefined,
+        })
+      )
+    )
+  );
 }
 
 export async function createNotification(notification: NewNotification) {

@@ -1,10 +1,12 @@
 import Link from 'next/link';
-import { Zap, MapPin, LogOut, FileText, Bookmark } from 'lucide-react';
+import { Zap, MapPin, LogOut, FileText, Bookmark, Smartphone, Bell } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
 import { hasActivityScopeConnected } from '@/lib/performance';
 import { getSavedPlaces } from '@/lib/saved-places';
 import SavedPlacesManager from '@/components/SavedPlacesManager';
+import InstallAppPrompt from '@/components/InstallAppPrompt';
+import PushNotificationsToggle from '@/components/PushNotificationsToggle';
 import { signIn } from '@/auth';
 import { signOutAction } from '@/app/actions';
 import LocationSettings from '@/components/LocationSettings';
@@ -59,6 +61,24 @@ export default async function SettingsPage() {
               </form>
             </>
           )}
+        </section>
+
+        {/* Application installable (PWA) */}
+        <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+            <Smartphone className="w-4 h-4" />
+            Application
+          </h2>
+          <InstallAppPrompt variant="card" />
+        </section>
+
+        {/* Notifications push */}
+        <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+            <Bell className="w-4 h-4" />
+            Notifications
+          </h2>
+          <PushNotificationsToggle />
         </section>
 
         {/* Localisation */}

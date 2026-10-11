@@ -26,8 +26,24 @@ const nextConfig = {
   // Un package-lock.json existe dans le dossier parent : on fixe la racine du
   // projet pour que Next ne la devine pas de travers.
   outputFileTracingRoot: dirname(fileURLToPath(import.meta.url)),
+  // Identifiant du build (commit déployé sur Vercel), utilisé pour détecter
+  // qu'une nouvelle version est en ligne (components/PwaManager.tsx).
+  env: {
+    NEXT_PUBLIC_APP_VERSION: process.env.VERCEL_GIT_COMMIT_SHA || 'dev',
+  },
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      {
+        // Le service worker doit toujours être revérifié, sinon une ancienne
+        // version pourrait rester active sur les téléphones.
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+    ];
   },
 };
 

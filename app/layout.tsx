@@ -6,6 +6,7 @@ import { Bell, Settings } from 'lucide-react';
 
 import HeaderMenu from '@/components/HeaderMenu';
 import BottomNav from '@/components/BottomNav';
+import PwaManager from '@/components/PwaManager';
 import { getCurrentUser } from '@/lib/session';
 import { getUnreadConversationsCount } from '@/lib/messages';
 import { getUnreadNotificationCount } from '@/lib/notifications';
@@ -105,6 +106,7 @@ export default async function RootLayout({
 
           <BottomNav unreadMessages={unreadMessages} />
         </div>
+        <PwaManager />
       </body>
     </html>
   );
