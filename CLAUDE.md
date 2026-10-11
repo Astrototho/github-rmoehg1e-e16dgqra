@@ -13,14 +13,41 @@ SaaS that lets athletes propose sports outings (**trail** or **road cycling**) a
 Target user flow (zero friction):
 1. **Onboarding** — one-click Strava sign-in, nothing else: no email/password, no profile to fill in. The user's performance profile is computed in the background right after sign-in.
 2. **Proposing an outing** — "Proposer une sortie" button → simple form: sport (trail/vélo), date/time, place (autocomplete via Mapbox/Google), stats (km / D+). Submit, done.
-3. **Browsing** — the home feed is a social-network-style list of blocks. Each block shows: place, km and D+ (with a map image of the route as background), meeting date, sport, proposer's age and profile photo, and a **match percentage** between the proposer and the viewer. The match % is the killer feature and must be visible at first glance. Tapping a block opens the detail view (map, proposer's profile).
+3. **Browsing** — the home feed is a social-network-style list of blocks. Each block shows: place, km and D+ (with a map image of the route as background), meeting date, sport, proposer's profile photo, and a **match percentage** between the proposer and the viewer. The match % is the killer feature and must be visible at first glance. Tapping a block opens the detail view (map, proposer's profile). (Age is no longer shown — see product decisions.)
 4. **Conversion** — "Participer" / "Matcher" button → the proposer gets a notification and accepts or refuses the participant.
 
-Stack: Next.js (React + TypeScript) front, Next.js Server Actions back, Auth.js (NextAuth) + Strava API, Supabase (PostgreSQL), Vercel hosting. The matching engine lives in `lib/matching.ts` (see below); its long-term form is still **to be defined**.
+Stack: Next.js (React + TypeScript) front, Next.js Server Actions back, Auth.js (NextAuth) + Strava API, Supabase (PostgreSQL), Vercel hosting. The matching engine lives in `lib/matching.ts` (see below); see the matching roadmap section for where it is heading.
 
-### Open product questions (to be answered by the owner, update this section as they are resolved)
+### Product decisions (answered by the owner)
 
-See the list of questions in the conversation history / project notes; until resolved, do not assume answers for: match-% formula weights, monetization, target launch area, moderation rules, and map provider.
+- **Launch area**: Grenoble. **Business model**: free for now (growth first).
+- **Participants**: no cap per outing; the organizer manually accepts/refuses each participant.
+- **Feed**: filtered/sorted by **match percentage**; past outings (`start_date` in the past) must disappear from the feed.
+- **Block content**: the proposer's **age is removed** from the outing block (do not add a birth date to `profiles`).
+- **Map**: the block's background image shows the **starting point** of the outing (not the full route). Provider: the easiest and free option. Geocoding/autocomplete already uses Photon (OpenStreetMap, no key) in `PlaceAutocomplete`/`CityPicker`, so prefer an OSM-based solution (no paid Mapbox/Google) unless a keyless/free static image proves impractical.
+- **Notifications**: in-app now (`notifications` table). Push notifications later, once the site becomes a real mobile app.
+- **Compute engine**: stays inside the Next.js app (simple, no separate service).
+- **Priorities (in order)**: 1) app stability, 2) decent UI (map, notifications), 3) turn the website into a real Android/iPhone app (PWA or native wrapper — approach still to be chosen).
+
+### Security TODO (later)
+
+`strava_tokens.access_token` / `refresh_token` are stored in **clear text**. Encrypt them at rest later (e.g. app-level AES-GCM with a key in an env var, or Supabase Vault). Not done on purpose for now — do not forget it before opening to the public.
+
+### Matching roadmap: from hand-made formula to learned model
+
+Current state: hand-weighted formula (`lib/matching.ts`, 4 indices, equal weights). Target vision: **do not run an AI for every match**. Instead, analyze the app's results (accepted/refused participations, `match_feedback.accurate`, whether the outing actually happened) and use an offline model trained on this data to **learn the parameters/weights** of the matching function; the app then simply loads those learned parameters and computes the % with a cheap formula. Therefore:
+- keep matching parameters isolated/configurable (like `WEIGHTS`), ideally versioned, so learned values can be dropped in;
+- log enough outcome data (feedback, accept/refuse) to build a training set;
+- avoid heavy per-request computation.
+
+Candidate Strava signals for richer features (not all implemented — today only speed, moving time, elevation gain and chill index are used):
+- **Athlete profile** (`/athlete`): sex, weight, athlete_type, ftp, bikes/shoes (road vs gravel vs trail), city/country, follower/friend counts, clubs.
+- **Aggregated stats** (`/athletes/{id}/stats`): recent (4 weeks) / YTD / all-time totals — current level vs historical level, similar progression.
+- **Activities** (`/athlete/activities`, the richest source): sport_type, workout_type, average/max speed, heart rate, watts, suffer_score, distance, moving_time, elevation gain/high/low, local start time (habitual time slot, weekday, seasonality), commute/trainer, device, kudos/comments, athlete_count (group rides), start/end lat-lng and polyline (usual zones, territory overlap).
+- **Zones** (`/athlete/zones`): heart-rate/power zones and time per zone — objective physiological level.
+- **Segments**: shared segments (same territory), kom/pr rank, starred segments, climb category.
+- **Clubs**, **Routes** (ambitions: 100 km vs 10 km habits), **Streams** (HR/power/cadence/altitude/grade time series, for the most engaged users).
+Check Strava API scopes and rate limits before depending on any of these.
 
 ## Commands
 
