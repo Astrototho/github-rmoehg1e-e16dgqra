@@ -8,7 +8,7 @@ PerfConnect — a Next.js 15 (App Router, React 19) mobile-first web app in Fren
 
 ### Product vision
 
-SaaS that lets athletes propose sports outings (**trail**, **running**, **road cycling** or **MTB**) and **match** them with other users based on their sports performance (data pulled from Strava). Hosted on Vercel (production: https://rmoehg1e-e16dgqra.vercel.app/), database on the Supabase project "PerfConnect" (ref `cbvetcddlbibkvzqzbup`, eu-west-1).
+SaaS that lets athletes propose sports outings (**trail**, **running**, **road cycling** or **MTB**) and **match** them with other users based on their sports performance (data pulled from Strava). Hosted on Vercel (production: https://app.perfconnect.fr — the old https://rmoehg1e-e16dgqra.vercel.app 308-redirects there; the marketing site https://perfconnect.fr is a separate site hosted at o2switch, whose DNS zone also holds the `app` CNAME to Vercel), database on the Supabase project "PerfConnect" (ref `cbvetcddlbibkvzqzbup`, eu-west-1).
 
 Target user flow (zero friction):
 1. **Onboarding** — one-click Strava sign-in, nothing else: no email/password, no profile to fill in. The user's performance profile is computed in the background right after sign-in (`after()`), then refreshed at most once a day.
@@ -31,7 +31,7 @@ Stack: Next.js (React + TypeScript) front, Next.js Server Actions back, Auth.js 
 - **Map**: the block's background image shows the **starting point** of the outing (not the full route), built from raw OpenStreetMap tiles (`components/maps/StaticMap.tsx`, no key, no JS). Interactive maps (detail page, start-point picker) use Leaflet + OSM tiles; geocoding uses Photon (OSM, no key). No paid Mapbox/Google. OSM's tile usage policy only tolerates light traffic: switch to a dedicated tile provider before significant growth.
 - **Notifications**: in-app now (`notifications` table). Push notifications later, once the site becomes a real mobile app.
 - **Compute engine**: stays inside the Next.js app (simple, no separate service).
-- **Priorities (in order)**: 1) app stability, 2) decent UI (map, notifications), 3) turn the website into a real Android/iPhone app. A first step is done: the site is an installable PWA (`app/manifest.ts`, generated icons, safe-area handling) — no service worker/offline mode yet.
+- **Priorities (in order)**: 1) app stability, 2) decent UI (map, notifications), 3) turn the website into a real Android/iPhone app. Chosen path: **PWA first** (done: installable, service worker, offline page, Web Push), then an Android TWA on the Play Store, then possibly an iOS Capacitor shell. Every wrapper loads the live site, so a Vercel deploy updates every user instantly — the app can never be bundled offline (SSR + Server Actions).
 
 ### Security notes
 
@@ -75,6 +75,9 @@ Copy `exampleOfenv.txt` to `.env.local` and fill in:
 - `AUTH_SECRET`, `AUTH_URL` (NextAuth)
 - `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET` (Strava OAuth app — the same app works locally: Strava always accepts `localhost` callbacks)
 - `STRAVA_TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`, one per environment; must also be set on Vercel)
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (Web Push; `npx web-push generate-vapid-keys`, one pair per environment — without them push is simply disabled)
+
+On Vercel, `AUTH_URL` (Production) is `https://app.perfconnect.fr` and the Strava app's callback domain is `app.perfconnect.fr`: Strava accepts a single callback domain (plus `localhost`), so Strava sign-in cannot work on Vercel preview URLs.
 
 Do not run `vercel env pull .env.local`: the Vercel variables are marked "Sensitive" and come back empty, overwriting the local file. `lib/supabase-admin.ts` throws when `createAdminClient()` is called without the service role key.
 
@@ -95,13 +98,14 @@ Do not run `vercel env pull .env.local`: the Vercel variables are marked "Sensit
 - [lib/matching.ts](lib/matching.ts) — `computeMatchPercentage(viewer, organizer, viewerGeo, organizerGeo)`: weighted closeness of the 4 indices (equal weights 0.25 each, isolated in `WEIGHTS`, formula version in `MATCHING_VERSION`) plus a geo **bonus only** (+5 same city, +2 same country, never a penalty). Returns `null` when either side has no performance profile for the sport. The % shown when a participation is requested is logged in `participations.match_percentage` / `matching_version` (training data).
 - [lib/notifications.ts](lib/notifications.ts), [lib/messages.ts](lib/messages.ts) — notification creation/reading and unread counters.
 
-**Database** (migrations in [supabase/migrations/](supabase/migrations/), `001`–`012`): `profiles.id` is text (the Strava athlete ID) and is the FK target for every user reference. RLS is enabled on **all** tables. Verified against the live Supabase project (schema `public`):
+**Database** (migrations in [supabase/migrations/](supabase/migrations/), `001`–`013`): `profiles.id` is text (the Strava athlete ID) and is the FK target for every user reference. RLS is enabled on **all** tables. Verified against the live Supabase project (schema `public`):
 
 | Table | Purpose / key columns |
 |---|---|
 | `profiles` | PK `id` (Strava ID), `name`, `avatar_url`, `email`, `bio`, `strava_username`, `city`, `country`, `latitude`, `longitude` |
 | `activities` | the outings: `title`, `type` (CHECK: 4 sports), `start_date`, `location` (start place name), `latitude`/`longitude` (start point), `distance`, `elevation`, `description`, `organizer_id` (FK profiles) + denormalized `organizer_name`/`organizer_avatar`, `status` (`active`/`cancelled`), `cancelled_at`, `updated_at` |
 | `participations` | `activity_id`, `user_id`, `status` (`pending`/`approved`/`rejected`, default `pending`), `match_percentage`, `matching_version` |
+| `push_subscriptions` | Web Push subscriptions: `user_id`, `endpoint` (unique), `p256dh`, `auth`, `vapid_public_key`, `user_agent`, `last_used_at` — service-role only |
 | `saved_places` | organizers' saved start places: `user_id`, `name`, `name_normalized` (unique per user), `latitude`, `longitude` — private, service-role only |
 | `messages` | `sender_id`, `receiver_id`, denormalized `sender_name`/`sender_avatar`, `content`, `is_read` |
 | `notifications` | `user_id`, `type` (`message`/`participation_request`/`participation_approved`/`participation_rejected`/`activity_updated`/`activity_cancelled`), `title`, `body`, `link`, `is_read`, `related_id` |
@@ -110,13 +114,15 @@ Do not run `vercel env pull .env.local`: the Vercel variables are marked "Sensit
 | `match_feedback` | per-activity feedback on match quality: `activity_id`, `rater_id`, `rated_id`, `accurate` (bool) — service-role only |
 | `user_reports` | moderation reports: `activity_id`, `reporter_id`, `reported_id`, `reason`, `description` — strictly confidential, service-role only |
 
-Access policy: `profiles`/`activities`/`participations` have public SELECT policies only; `messages`, `notifications`, `strava_tokens`, `performance_profiles`, `saved_places`, `match_feedback` and `user_reports` have no policy (service-role client only, i.e. only through server code — never query them from the client with the anon key; the app has no anon/browser Supabase client at all). Apply migrations via the Supabase MCP in Claude Code (the owner authorized applying them directly) or the Supabase SQL editor; there is no CLI-driven migration workflow in this repo. Note: the local dev environment and production share this single Supabase project. Always add a new numbered migration file in `supabase/migrations/` for any schema change so the repo stays the source of truth.
+Access policy: `profiles`/`activities`/`participations` have public SELECT policies only; `messages`, `notifications`, `strava_tokens`, `performance_profiles`, `saved_places`, `push_subscriptions`, `match_feedback` and `user_reports` have no policy (service-role client only, i.e. only through server code — never query them from the client with the anon key; the app has no anon/browser Supabase client at all). Apply migrations via the Supabase MCP in Claude Code (the owner authorized applying them directly) or the Supabase SQL editor; there is no CLI-driven migration workflow in this repo. Note: the local dev environment and production share this single Supabase project. Always add a new numbered migration file in `supabase/migrations/` for any schema change so the repo stays the source of truth.
 
-**Routing** ([app/](app/)): `/` (activity feed), `/activities` (my outings, tabs), `/activities/[id]`, `/activities/[id]/edit`, `/create`, `/users/[id]` (public profile: sports + match %, never raw Strava data), `/messages`, `/messages/[id]` (polls every 5 s while visible), `/notifications`, `/profile`, `/settings`, `/legal`, `/login`; API route `/api/auth/[...nextauth]`; PWA routes `/manifest.webmanifest`, `/icon/[id]`, `/apple-icon`. Next 15: page `params`/`searchParams` are Promises (`await params`). [app/layout.tsx](app/layout.tsx) renders a mobile-width shell (top bar + [components/BottomNav.tsx](components/BottomNav.tsx)) and calls `getCurrentUser()` server-side; it has `export const dynamic = 'force-dynamic'`. `app/error.tsx`, `app/global-error.tsx` and `app/not-found.tsx` handle failures.
+**Routing** ([app/](app/)): `/` (activity feed), `/activities` (my outings, tabs), `/activities/[id]`, `/activities/[id]/edit`, `/create`, `/users/[id]` (public profile: sports + match %, never raw Strava data), `/messages`, `/messages/[id]` (polls every 5 s while visible), `/notifications`, `/profile`, `/settings`, `/legal`, `/login`; API routes `/api/auth/[...nextauth]` and `/api/version`; PWA routes `/manifest.webmanifest`, `/icon/[id]`, `/apple-icon`, static `/sw.js` and `/offline.html`. Next 15: page `params`/`searchParams` are Promises (`await params`). [app/layout.tsx](app/layout.tsx) renders a mobile-width shell (top bar + [components/BottomNav.tsx](components/BottomNav.tsx)) and calls `getCurrentUser()` server-side; it has `export const dynamic = 'force-dynamic'`. `app/error.tsx`, `app/global-error.tsx` and `app/not-found.tsx` handle failures.
 
 **Mobile**: `viewport-fit=cover` + utilities in [app/globals.css](app/globals.css) — `pt-safe`/`pb-safe` (notch/home indicator), `pb-nav` (space for the bottom nav), `top-header` (sticky sub-headers under the top bar), `bottom-nav-offset` (sticky CTA above the nav). Inputs are forced to 16 px on phones (prevents the iOS focus zoom); use `min-h-dvh`/`dvh`, never `100vh`; keep tap targets ≥ 44 px. Leaflet maps must sit in a `relative z-0` wrapper so their panes don't cover sticky headers/modals.
 
 **Security headers** are set in [next.config.mjs](next.config.mjs) (frame-ancestors none, nosniff, referrer policy, permissions policy allowing geolocation for self, HSTS).
+
+**PWA**: [public/sw.js](public/sw.js) (hand-written service worker, registered in production only by [components/PwaManager.tsx](components/PwaManager.tsx); set `NEXT_PUBLIC_ENABLE_SW=true` to test it in dev): pages are always fetched from the network (never cached — personal data) with [public/offline.html](public/offline.html) as offline fallback; hashed `/_next/static` files are cache-first; bump `CACHE_VERSION` to drop the static cache. `PwaManager` also compares the build's `NEXT_PUBLIC_APP_VERSION` (commit SHA, injected in `next.config.mjs`) with `/api/version` and shows a "Mettre à jour" banner after a deploy. Install UI: [components/InstallAppPrompt.tsx](components/InstallAppPrompt.tsx) (Android `beforeinstallprompt`, iOS "Partager → Sur l'écran d'accueil"). **Web Push**: [lib/push.ts](lib/push.ts) (`web-push`, VAPID) sends a push for every row created by `createNotifications()` and for each new chat message; subscriptions live in `push_subscriptions` (stored with the VAPID public key used, because local dev and production share the database) and only browser push services are accepted as endpoints (SSRF guard). On iPhone, push only works once the app is installed on the home screen (iOS 16.4+). The Claude app's built-in browser cannot register service workers: test them in a real Chrome.
 
 **Path alias**: `@/*` maps to the repo root (see [tsconfig.json](tsconfig.json)), e.g. `@/lib/session`, `@/auth`.
 

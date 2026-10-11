@@ -11,6 +11,12 @@ AUTH_URL=http://localhost:3000
 # Générer : openssl rand -base64 32 — une valeur différente par environnement.
 STRAVA_TOKEN_ENCRYPTION_KEY=
 
+# Notifications push (PWA) — une paire par environnement :
+#   npx web-push generate-vapid-keys
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=https://app.perfconnect.fr
+
 # Strava OAuth (https://www.strava.com/settings/api)
 # ⚠️ Depuis juillet 2026, le propriétaire de l'app Strava doit avoir un
 # abonnement Strava actif, sinon l'API répond 403 "Application Inactive".
