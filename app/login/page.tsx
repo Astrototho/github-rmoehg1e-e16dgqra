@@ -1,7 +1,25 @@
 import { signIn } from '@/auth';
 import Link from 'next/link';
 
-export default function LoginPage() {
+// Codes renvoyés dans ?error= par Auth.js (ou par le callback signIn).
+const ERROR_MESSAGES: Record<string, string> = {
+  StravaProfile:
+    "Strava n'a pas transmis ton profil. Réessaie dans quelques minutes.",
+  AccessDenied: 'Connexion refusée. Réessaie dans quelques minutes.',
+};
+
+const DEFAULT_ERROR_MESSAGE =
+  'La connexion avec Strava a échoué. Réessaie dans quelques minutes.';
+
+interface LoginPageProps {
+  searchParams: { error?: string };
+}
+
+export default function LoginPage({ searchParams }: LoginPageProps) {
+  const errorMessage = searchParams.error
+    ? ERROR_MESSAGES[searchParams.error] ?? DEFAULT_ERROR_MESSAGE
+    : null;
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center">
       <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6">
@@ -14,6 +32,15 @@ export default function LoginPage() {
         Connecte-toi avec ton compte Strava pour proposer des sorties,
         participer et échanger avec la communauté.
       </p>
+
+      {errorMessage && (
+        <p
+          role="alert"
+          className="w-full max-w-xs mb-6 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3"
+        >
+          {errorMessage}
+        </p>
+      )}
 
       <form
         action={async () => {

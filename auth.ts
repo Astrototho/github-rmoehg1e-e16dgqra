@@ -29,6 +29,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET,
   pages: {
     signIn: '/login',
+    // Les erreurs de connexion (accès refusé, échec OAuth...) reviennent sur
+    // la page de connexion, qui affiche un message lisible.
+    error: '/login',
   },
   callbacks: {
     async signIn({ account, profile }) {
@@ -37,6 +40,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       const stravaProfile = profile as StravaAthleteProfile;
+
+      // Si l'appel Strava /athlete échoue (application Strava inactive, quota
+      // dépassé...), Auth.js reçoit le corps d'erreur à la place du profil et
+      // invente un identifiant aléatoire : on refuse la connexion plutôt que
+      // de créer un profil fantôme sans lien avec le compte Strava.
+      if (
+        stravaProfile?.id == null ||
+        !/^\d+$/.test(String(account.providerAccountId))
+      ) {
+        console.error(
+          'Profil Strava invalide à la connexion :',
+          JSON.stringify(profile)
+        );
+        return '/login?error=StravaProfile';
+      }
       const name =
         [stravaProfile.firstname, stravaProfile.lastname]
           .filter(Boolean)
