@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { Zap, MapPin, LogOut, FileText } from 'lucide-react';
+import { Zap, MapPin, LogOut, FileText, Bookmark } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
-import { createAdminClient } from '@/lib/supabase-admin';
 import { hasActivityScopeConnected } from '@/lib/performance';
+import { getSavedPlaces } from '@/lib/saved-places';
+import SavedPlacesManager from '@/components/SavedPlacesManager';
 import { signIn } from '@/auth';
 import { signOutAction } from '@/app/actions';
 import LocationSettings from '@/components/LocationSettings';
@@ -17,13 +18,10 @@ export default async function SettingsPage() {
     redirect('/login');
   }
 
-  const stravaConnected = await hasActivityScopeConnected(currentUser.id);
-
-  const { data: profileRow } = await createAdminClient()
-    .from('profiles')
-    .select('city, country')
-    .eq('id', currentUser.id)
-    .single();
+  const [stravaConnected, savedPlaces] = await Promise.all([
+    hasActivityScopeConnected(currentUser.id),
+    getSavedPlaces(currentUser.id),
+  ]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -69,14 +67,23 @@ export default async function SettingsPage() {
             <MapPin className="w-4 h-4" />
             Localisation
           </h2>
-          <LocationSettings city={profileRow?.city} country={profileRow?.country} />
+          <LocationSettings city={currentUser.city} country={currentUser.country} />
+        </section>
+
+        {/* Lieux de départ enregistrés */}
+        <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+            <Bookmark className="w-4 h-4" />
+            Mes lieux de départ
+          </h2>
+          <SavedPlacesManager places={savedPlaces} />
         </section>
 
         {/* Légal */}
         <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <Link
             href="/legal"
-            className="flex items-center gap-2 text-sm text-gray-700 hover:text-primary transition-colors"
+            className="flex min-h-[44px] items-center gap-2 text-sm text-gray-700 hover:text-primary transition-colors"
           >
             <FileText className="w-4 h-4" />
             Politique de confidentialité

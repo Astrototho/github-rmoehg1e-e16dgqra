@@ -4,7 +4,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Send } from 'lucide-react';
 import { getConversation, sendMessage } from '@/app/actions';
+import { MESSAGE_MAX } from '@/lib/constraints';
 import type { Message } from '@/lib/types';
+
+// Fréquence de rafraîchissement de la conversation quand l'onglet est visible.
+const POLL_INTERVAL_MS = 5000;
 
 interface ChatClientProps {
   contactId: string;
@@ -22,77 +26,107 @@ export default function ChatClient({
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastMessageId = useRef<string | null>(null);
 
   const loadMessages = useCallback(async () => {
     const result = await getConversation(contactId);
     if (result.success && result.data) {
       setMessages(result.data);
+    } else if (!result.success) {
+      setError(result.error);
     }
     setIsLoading(false);
   }, [contactId]);
 
+  // Chargement initial puis rafraîchissement régulier tant que la page est
+  // visible (pas de requêtes inutiles quand le téléphone est en veille).
   useEffect(() => {
     loadMessages();
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') loadMessages();
+    }, POLL_INTERVAL_MS);
+    const onVisible = () => document.visibilityState === 'visible' && loadMessages();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [loadMessages]);
 
+  // Défilement en bas uniquement quand un nouveau message arrive.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const last = messages[messages.length - 1]?.id ?? null;
+    if (last && last !== lastMessageId.current) {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: lastMessageId.current ? 'smooth' : 'auto',
+      });
+      lastMessageId.current = last;
+    }
   }, [messages]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    const content = newMessage.trim();
+    if (!content || isSending) return;
 
-    const content = newMessage;
-    setNewMessage('');
+    setIsSending(true);
+    setError(null);
+    const result = await sendMessage(contactId, content);
+    setIsSending(false);
 
-    await sendMessage(contactId, content);
-    await loadMessages();
+    if (result.success && result.data) {
+      setNewMessage('');
+      setMessages((prev) => [...prev, result.data!]);
+    } else if (!result.success) {
+      // Le texte reste dans le champ pour pouvoir réessayer.
+      setError(result.error);
+    }
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-7.5rem)] bg-gray-50">
-      <header className="bg-white border-b px-4 h-16 flex items-center gap-4 shrink-0 shadow-sm z-10">
+    <div className="flex h-[calc(100dvh-8.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] flex-col bg-gray-50">
+      <header className="z-10 flex h-16 shrink-0 items-center gap-3 border-b bg-white px-4 shadow-sm">
         <Link
           href="/messages"
-          className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
+          aria-label="Retour aux messages"
+          className="-ml-2 rounded-full p-2 transition-colors hover:bg-gray-100"
         >
-          <ArrowLeft className="w-6 h-6 text-gray-700" />
+          <ArrowLeft className="h-6 w-6 text-gray-700" />
         </Link>
-        <div className="flex items-center gap-3">
+        <Link href={`/users/${contactId}`} className="flex min-w-0 items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={contactAvatar}
-            alt={contactName}
-            className="w-10 h-10 rounded-full object-cover border border-gray-100"
+            alt=""
+            className="h-10 w-10 flex-shrink-0 rounded-full border border-gray-100 object-cover"
           />
-          <h1 className="font-bold text-gray-900">{contactName}</h1>
-        </div>
+          <h1 className="truncate font-bold text-gray-900">{contactName}</h1>
+        </Link>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
         {isLoading ? (
-          <div className="text-center text-gray-500 mt-10 text-sm animate-pulse">
+          <div className="mt-10 animate-pulse text-center text-sm text-gray-500">
             Chargement...
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center text-gray-500 mt-10 text-sm">
-            Envoyez un message pour commencer la discussion avec {contactName}.
+          <div className="mt-10 text-center text-sm text-gray-500">
+            Envoie un message pour commencer la discussion avec {contactName}.
           </div>
         ) : (
           messages.map((msg) => {
             const isMe = msg.sender_id === currentUserId;
             return (
-              <div
-                key={msg.id}
-                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-              >
+              <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
+                  className={`max-w-[80%] whitespace-pre-line break-words rounded-2xl px-4 py-2.5 text-sm ${
                     isMe
-                      ? 'bg-primary text-white rounded-br-sm'
-                      : 'bg-white border border-gray-200 text-gray-900 rounded-bl-sm shadow-sm'
+                      ? 'rounded-br-sm bg-primary text-white'
+                      : 'rounded-bl-sm border border-gray-200 bg-white text-gray-900 shadow-sm'
                   }`}
                 >
                   {msg.content}
@@ -104,21 +138,26 @@ export default function ChatClient({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="bg-white border-t p-3 shrink-0">
-        <form onSubmit={handleSend} className="flex gap-2 items-center">
+      <div className="shrink-0 border-t bg-white p-3">
+        {error && <p className="mb-2 px-2 text-xs text-red-600">{error}</p>}
+        <form onSubmit={handleSend} className="flex items-center gap-2">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Écrire un message..."
-            className="flex-1 bg-gray-100 border-transparent focus:bg-gray-200 focus:ring-0 rounded-full px-4 py-2.5 outline-none text-sm transition-colors"
+            maxLength={MESSAGE_MAX}
+            enterKeyHint="send"
+            aria-label="Message"
+            className="flex-1 rounded-full border-transparent bg-gray-100 px-4 py-2.5 text-sm outline-none transition-colors focus:bg-gray-200 focus:ring-0"
           />
           <button
             type="submit"
-            disabled={!newMessage.trim()}
-            className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:hover:bg-primary text-white p-2.5 rounded-full transition-colors flex-shrink-0"
+            disabled={!newMessage.trim() || isSending}
+            aria-label="Envoyer"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:hover:bg-primary"
           >
-            <Send className="w-5 h-5" />
+            <Send className="h-5 w-5" />
           </button>
         </form>
       </div>

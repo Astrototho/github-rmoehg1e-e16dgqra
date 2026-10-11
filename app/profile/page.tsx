@@ -8,79 +8,60 @@ export const dynamic = 'force-dynamic';
 
 export default async function ProfilePage() {
   const currentUser = await getCurrentUser();
-  if (!currentUser) {
-    redirect('/login');
-  }
+  if (!currentUser) redirect('/login');
 
   const admin = createAdminClient();
+  const [{ data: myActivities }, { count: participationCount }] = await Promise.all([
+    admin
+      .from('activities')
+      .select('id, title, type, start_date, status')
+      .eq('organizer_id', currentUser.id)
+      .order('start_date', { ascending: false }),
+    admin
+      .from('participations')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', currentUser.id)
+      .eq('status', 'approved'),
+  ]);
 
-  const { count: organizedCount } = await admin
-    .from('activities')
-    .select('*', { count: 'exact', head: true })
-    .eq('organizer_id', currentUser.id);
-
-  const { count: participationCount } = await admin
-    .from('participations')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', currentUser.id)
-    .eq('status', 'approved');
-
-  const { data: myActivities } = await admin
-    .from('activities')
-    .select('id, title, type, start_date')
-    .eq('organizer_id', currentUser.id)
-    .order('start_date', { ascending: false });
-
-  const { data: profileRow } = await admin
-    .from('profiles')
-    .select('city, country, latitude, longitude')
-    .eq('id', currentUser.id)
-    .single();
+  const organizedCount = (myActivities ?? []).filter((a) => a.status !== 'cancelled').length;
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="overflow-y-auto pb-6">
+    <div className="flex h-full flex-col bg-white">
+      <div className="pb-6">
         <div className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="relative">
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
-                className="w-20 h-20 rounded-full object-cover border-2 border-gray-100"
-              />
-            </div>
-
+          <div className="mb-4 flex items-center justify-between">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={currentUser.avatar}
+              alt={currentUser.name}
+              className="h-20 w-20 rounded-full border-2 border-gray-100 object-cover"
+            />
             <ShareInviteButton />
           </div>
 
-          <div className="mb-3">
-            <h2 className="text-xl font-bold text-gray-900">
-              {currentUser.name}
-            </h2>
-          </div>
+          <h2 className="mb-3 break-words text-xl font-bold text-gray-900">{currentUser.name}</h2>
 
-          <div className="flex gap-6 mb-4 text-center">
+          <div className="mb-4 flex gap-6 text-center">
             <div>
               <p className="text-lg font-bold text-gray-900">
-                {(organizedCount ?? 0) + (participationCount ?? 0)}
+                {organizedCount + (participationCount ?? 0)}
               </p>
               <p className="text-xs text-gray-500">Sorties</p>
             </div>
           </div>
 
           {currentUser.bio && (
-            <p className="text-sm text-gray-700 whitespace-pre-line">
-              {currentUser.bio}
-            </p>
+            <p className="whitespace-pre-line text-sm text-gray-700">{currentUser.bio}</p>
           )}
         </div>
 
         <ProfileTabs
           activities={myActivities ?? []}
-          city={profileRow?.city}
-          country={profileRow?.country}
-          latitude={profileRow?.latitude}
-          longitude={profileRow?.longitude}
+          city={currentUser.city}
+          country={currentUser.country}
+          latitude={currentUser.latitude}
+          longitude={currentUser.longitude}
         />
       </div>
     </div>

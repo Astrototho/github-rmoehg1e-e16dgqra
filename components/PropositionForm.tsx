@@ -1,241 +1,267 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation'; // <-- Ajout de useRouter
-import { X, MapPin, Calendar, TrendingUp } from 'lucide-react';
-import { createActivity } from '@/app/actions';
-import PlaceAutocomplete from '@/components/PlaceAutocomplete';
+import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { MapPin, Calendar, TrendingUp, AlertCircle } from 'lucide-react';
+import { createActivity, updateActivity } from '@/app/actions';
+import StartPlacePicker from '@/components/StartPlacePicker';
+import type { Coordinates } from '@/components/maps/MapPickerModal';
+import { SPORTS, type ActivityType } from '@/lib/sports';
+import { todayInParis, toParisInputValues } from '@/lib/dates';
+import { DESCRIPTION_MAX, TITLE_MAX, buildDefaultTitle } from '@/lib/constraints';
+import type { Activity, SavedPlace } from '@/lib/types';
 
-type SportType = 'trail' | 'course-a-pied' | 'velo-route' | 'velo' | 'vtt';
+// Libellés courts pour tenir sur 4 colonnes, même sur un écran de 320 px.
+const SHORT_LABELS: Record<ActivityType, string> = {
+  trail: 'Trail',
+  'course-a-pied': 'Course',
+  'velo-route': 'Route',
+  vtt: 'VTT',
+};
+
+const inputClass =
+  'w-full min-w-0 rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50';
 
 interface PropositionFormProps {
-  onClose?: () => void;
+  savedPlaces: SavedPlace[];
+  fallbackCenter: Coordinates;
+  // Présent en mode modification.
+  activity?: Activity;
 }
 
-export default function PropositionForm({ onClose }: PropositionFormProps) {
-  const [sport, setSport] = useState<SportType>('trail');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
-  const today = new Date().toISOString().split('T')[0];
-
-  // Initialisation du router
+export default function PropositionForm({
+  savedPlaces,
+  fallbackCenter,
+  activity,
+}: PropositionFormProps) {
+  const isEdit = !!activity;
   const router = useRouter();
+  const errorRef = useRef<HTMLDivElement>(null);
+  const [sport, setSport] = useState<ActivityType>(
+    (SPORTS.find((s) => s.value === activity?.type)?.value as ActivityType) ?? 'trail'
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const actionHandler = async (formData: FormData) => {
-    setIsSubmitting(true);
+  const initialDateTime = activity ? toParisInputValues(activity.start_date) : null;
+  // Un titre généré automatiquement n'est pas pré-rempli : il sera régénéré
+  // avec les nouvelles valeurs (distance, lieu...) s'il reste vide.
+  const initialTitle =
+    activity && activity.title !== buildDefaultTitle(activity) ? activity.title : undefined;
+  const initialCoords =
+    activity?.latitude != null && activity?.longitude != null
+      ? { latitude: Number(activity.latitude), longitude: Number(activity.longitude) }
+      : null;
 
-    // On attend la réponse du serveur
-    const result = await createActivity(formData);
+  const showError = (message: string) => {
+    setError(message);
+    // Le message est en haut du formulaire : on le rend visible sur mobile.
+    requestAnimationFrame(() =>
+      errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    );
+  };
 
-    if (result.success) {
-      // Si c'est un succès, on nettoie tout
-      if (formRef.current) formRef.current.reset();
-      if (onClose) onClose();
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
 
-      // On force le rafraîchissement des données de la page d'accueil
-      router.refresh();
-      // Et on redirige
-      router.push('/');
-    } else {
-      // S'il y a une erreur, on l'affiche et on arrête le chargement
-      alert(result.error);
-      setIsSubmitting(false);
+    if (!formData.get('latitude') || !formData.get('longitude')) {
+      showError('Place le point de départ sur la carte.');
+      return;
     }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    const result = activity
+      ? await updateActivity(activity.id, formData)
+      : await createActivity(formData);
+
+    if (result.success && result.data) {
+      router.push(`/activities/${result.data.id}`);
+      router.refresh();
+      return;
+    }
+
+    setIsSubmitting(false);
+    showError(result.success ? 'Une erreur inattendue est survenue.' : result.error);
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <header className="flex items-center justify-between px-4 h-14 border-b border-gray-100 bg-gray-50/50">
-        <span className="font-semibold text-gray-900 ml-2">
-          Nouvelle sortie
-        </span>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        )}
-      </header>
+    <form onSubmit={handleSubmit} className="space-y-6 p-5">
 
-      <form ref={formRef} action={actionHandler} className="p-6">
+      {error && (
+        <div
+          ref={errorRef}
+          role="alert"
+          className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
+      <fieldset>
         <input type="hidden" name="type" value={sport} />
+        <legend className="mb-3 block text-sm font-medium text-gray-700">Sport</legend>
+        <div className="grid grid-cols-4 gap-2">
+          {SPORTS.map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              onClick={() => setSport(s.value)}
+              aria-pressed={sport === s.value}
+              className={`flex min-h-[64px] flex-col items-center justify-center rounded-xl border-2 p-2 transition-all ${
+                sport === s.value
+                  ? 'border-primary bg-primary/5'
+                  : 'border-gray-100 bg-white hover:border-gray-200'
+              }`}
+            >
+              <span className="mb-1 text-2xl" aria-hidden="true">
+                {s.emoji}
+              </span>
+              <span className="text-xs font-medium">{SHORT_LABELS[s.value]}</span>
+            </button>
+          ))}
+        </div>
+      </fieldset>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Titre de la sortie
+      <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2">
+        <div className="min-w-0">
+          <label htmlFor="date" className="mb-2 flex items-center text-sm font-medium text-gray-700">
+            <Calendar className="mr-2 h-4 w-4 text-gray-400" />
+            Date
           </label>
           <input
-            type="text"
-            name="title"
-            placeholder="Ex: Sortie longue à la Bastille"
+            id="date"
+            type="date"
+            name="date"
             required
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+            min={todayInParis()}
+            defaultValue={initialDateTime?.date}
+            className={inputClass}
           />
         </div>
-
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Type de sortie
+        <div className="min-w-0">
+          <label htmlFor="time" className="mb-2 block text-sm font-medium text-gray-700">
+            Heure
           </label>
-          <div className="grid grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={() => setSport('trail')}
-              className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
-                sport === 'trail'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-100 bg-white hover:border-gray-200'
-              }`}
-            >
-              <div className="text-2xl mb-1">⛰️</div>
-              <div className="text-sm font-medium">Trail</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSport('course-a-pied')}
-              className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
-                sport === 'course-a-pied'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-100 bg-white hover:border-gray-200'
-              }`}
-            >
-              <div className="text-2xl mb-1">🏃</div>
-              <div className="text-sm font-medium">Course</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSport('velo-route')}
-              className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
-                sport === 'velo-route'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-100 bg-white hover:border-gray-200'
-              }`}
-            >
-              <div className="text-2xl mb-1">🚴</div>
-              <div className="text-sm font-medium">Route</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSport('velo')}
-              className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
-                sport === 'velo'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-100 bg-white hover:border-gray-200'
-              }`}
-            >
-              <div className="text-2xl mb-1">🚴</div>
-              <div className="text-sm font-medium">Vélo</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSport('vtt')}
-              className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center ${
-                sport === 'vtt'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-100 bg-white hover:border-gray-200'
-              }`}
-            >
-              <div className="text-2xl mb-1">🚵</div>
-              <div className="text-sm font-medium">VTT</div>
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-              <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-              Date
-            </label>
-            <input
-              type="date"
-              name="date"
-              required
-              min={today}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Heure
-            </label>
-            <input
-              type="time"
-              name="time"
-              required
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-            <MapPin className="w-4 h-4 mr-2 text-gray-400" />
-            Lieu de départ
-          </label>
-          <PlaceAutocomplete
-            placeholder="Ex: Parking de la Mairie"
-            name="location"
-            latName="latitude"
-            lngName="longitude"
+          <input
+            id="time"
+            type="time"
+            name="time"
             required
+            defaultValue={initialDateTime?.time}
+            className={inputClass}
           />
         </div>
+      </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-              <TrendingUp className="w-4 h-4 mr-2 text-gray-400" />
-              Distance (km)
-            </label>
-            <input
-              type="number"
-              name="distance"
-              placeholder="Ex: 28"
-              required
-              step="0.1"
-              min="0"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-              Dénivelé (m D+)
-            </label>
-            <input
-              type="number"
-              name="elevation"
-              placeholder="Ex: 1800"
-              required
-              step="1"
-              min="0"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
-            />
-          </div>
-        </div>
+      <div>
+        <p className="mb-2 flex items-center text-sm font-medium text-gray-700">
+          <MapPin className="mr-2 h-4 w-4 text-gray-400" />
+          Lieu de départ
+        </p>
+        <StartPlacePicker
+          savedPlaces={savedPlaces}
+          fallbackCenter={fallbackCenter}
+          initialName={activity?.location}
+          initialCoords={initialCoords}
+        />
+      </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Description (optionnel)
+      <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2">
+        <div className="min-w-0">
+          <label
+            htmlFor="distance"
+            className="mb-2 flex items-center text-sm font-medium text-gray-700"
+          >
+            <TrendingUp className="mr-2 h-4 w-4 text-gray-400" />
+            Distance (km)
           </label>
-          <textarea
-            name="description"
-            placeholder="Décrivez l'ambiance, le niveau attendu..."
-            rows={3}
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none"
+          <input
+            id="distance"
+            type="number"
+            name="distance"
+            inputMode="decimal"
+            placeholder="Ex : 28"
+            required
+            step="0.1"
+            min="0.1"
+            max="1000"
+            defaultValue={activity?.distance}
+            className={inputClass}
           />
         </div>
+        <div className="min-w-0">
+          <label htmlFor="elevation" className="mb-2 block text-sm font-medium text-gray-700">
+            Dénivelé (m D+)
+          </label>
+          <input
+            id="elevation"
+            type="number"
+            name="elevation"
+            inputMode="numeric"
+            placeholder="Ex : 1800"
+            required
+            step="1"
+            min="0"
+            max="20000"
+            defaultValue={activity?.elevation}
+            className={inputClass}
+          />
+        </div>
+      </div>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full bg-primary hover:bg-primary/90 text-white py-3.5 rounded-xl font-bold transition-colors disabled:opacity-50"
-        >
-          {isSubmitting ? 'Publication en cours...' : 'Publier ma sortie'}
-        </button>
-      </form>
-    </div>
+      <div>
+        <label htmlFor="title" className="mb-2 block text-sm font-medium text-gray-700">
+          Titre <span className="font-normal text-gray-400">(optionnel)</span>
+        </label>
+        <input
+          id="title"
+          type="text"
+          name="title"
+          maxLength={TITLE_MAX}
+          placeholder="Généré automatiquement si vide"
+          defaultValue={initialTitle}
+          className={inputClass}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="description" className="mb-2 block text-sm font-medium text-gray-700">
+          Description <span className="font-normal text-gray-400">(optionnel)</span>
+        </label>
+        <textarea
+          id="description"
+          name="description"
+          placeholder="Décris l'ambiance, le niveau attendu..."
+          rows={3}
+          maxLength={DESCRIPTION_MAX}
+          defaultValue={activity?.description ?? undefined}
+          className={`${inputClass} resize-none`}
+        />
+      </div>
+
+      {isEdit && (
+        <p className="text-xs text-gray-500">
+          Les participants (acceptés et en attente) seront prévenus des changements.
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="w-full rounded-xl bg-primary py-3.5 font-bold text-white transition-colors hover:bg-primary/90 disabled:opacity-50"
+      >
+        {isSubmitting
+          ? isEdit
+            ? 'Enregistrement...'
+            : 'Publication en cours...'
+          : isEdit
+            ? 'Enregistrer les modifications'
+            : 'Publier ma sortie'}
+      </button>
+    </form>
   );
 }

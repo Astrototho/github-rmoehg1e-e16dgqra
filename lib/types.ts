@@ -21,17 +21,18 @@ export interface AppUser {
   strava_username?: string;
   latitude?: number | null;
   longitude?: number | null;
+  city?: string | null;
+  country?: string | null;
 }
 
-export type ActivityType =
-  | 'trail'
-  | 'course-a-pied'
-  | 'velo-route'
-  | 'velo'
-  | 'vtt';
+export type { ActivityType } from '@/lib/sports';
+
+export type ActivityStatus = 'active' | 'cancelled';
 
 export interface Activity {
   id: string;
+  created_at?: string;
+  updated_at?: string;
   title: string;
   type: string;
   start_date: string;
@@ -40,10 +41,19 @@ export interface Activity {
   longitude?: number | null;
   distance: number;
   elevation: number;
-  description?: string;
+  description?: string | null;
   organizer_id: string;
   organizer_name: string;
   organizer_avatar: string;
+  status: ActivityStatus;
+  cancelled_at?: string | null;
+}
+
+export interface SavedPlace {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface Participation {
@@ -52,6 +62,8 @@ export interface Participation {
   activity_id: string;
   status: 'pending' | 'approved' | 'rejected';
   created_at?: string;
+  match_percentage?: number | null;
+  matching_version?: string | null;
 }
 
 export interface ParticipationWithUser extends Participation {
@@ -75,13 +87,16 @@ export interface ConversationPreview {
   contactAvatar: string;
   lastMessage: string;
   time: string;
+  unread?: boolean;
 }
 
 export type NotificationType =
   | 'message'
   | 'participation_request'
   | 'participation_approved'
-  | 'participation_rejected';
+  | 'participation_rejected'
+  | 'activity_updated'
+  | 'activity_cancelled';
 
 export interface Notification {
   id: string;

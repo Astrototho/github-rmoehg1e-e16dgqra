@@ -8,7 +8,7 @@ export const metadata = {
 export default function LegalPage() {
   return (
     <div className="flex flex-col h-full bg-white">
-      <div className="sticky top-14 z-40 bg-white border-b px-4 h-14 flex items-center gap-3">
+      <div className="sticky top-header z-40 bg-white border-b px-4 h-14 flex items-center gap-3">
         <Link
           href="/settings"
           className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -64,7 +64,10 @@ export default function LegalPage() {
           <h2 className="font-bold text-gray-900">Stockage</h2>
           <p>
             Tes données sont stockées dans une base de données Supabase,
-            accessible uniquement depuis le serveur de l&apos;application.
+            accessible uniquement depuis le serveur de l&apos;application. Les
+            clés d&apos;accès à ton compte Strava y sont chiffrées. Les lieux de
+            départ que tu enregistres en proposant une sortie restent privés :
+            seul le point de départ de chaque sortie publiée est visible.
           </p>
         </section>
 
@@ -77,8 +80,10 @@ export default function LegalPage() {
             <Link href="/settings" className="text-primary underline">
               Paramètres
             </Link>{' '}
-            — ton profil, tes sorties, tes messages, tes notifications et tes
-            données de performance sont alors définitivement supprimés.
+            — ton profil, tes sorties, tes messages, tes notifications, tes
+            lieux enregistrés et tes données de performance sont alors
+            définitivement supprimés, et l&apos;accès de PerfConnect à ton
+            compte Strava est révoqué.
           </p>
         </section>
       </div>

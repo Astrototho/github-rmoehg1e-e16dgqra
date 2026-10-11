@@ -12,13 +12,12 @@ const DEFAULT_ERROR_MESSAGE =
   'La connexion avec Strava a échoué. Réessaie dans quelques minutes.';
 
 interface LoginPageProps {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 }
 
-export default function LoginPage({ searchParams }: LoginPageProps) {
-  const errorMessage = searchParams.error
-    ? ERROR_MESSAGES[searchParams.error] ?? DEFAULT_ERROR_MESSAGE
-    : null;
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { error } = await searchParams;
+  const errorMessage = error ? ERROR_MESSAGES[error] ?? DEFAULT_ERROR_MESSAGE : null;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center">

@@ -1,52 +1,53 @@
 import { notFound } from 'next/navigation';
 import ActivityDetailClient from '@/components/ActivityDetailClient';
-import {
-  getActivityById,
-  getActivityParticipations,
-  getMyParticipationForActivity,
-  getMyMatchFeedback,
-} from '@/app/actions';
+import { getActivityByIdFromDb } from '@/lib/activities';
+import { getParticipationsForActivity, getUserParticipation } from '@/lib/participations';
+import { getMatchPercentages } from '@/lib/feed';
 import { getCurrentUser } from '@/lib/session';
+import { createAdminClient } from '@/lib/supabase-admin';
+import { canEditActivity } from '@/lib/activity-rules';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
+}
+
+async function getMyMatchFeedback(activityId: string, userId: string) {
+  const { data } = await createAdminClient()
+    .from('match_feedback')
+    .select('accurate')
+    .eq('activity_id', activityId)
+    .eq('rater_id', userId)
+    .maybeSingle();
+  return (data?.accurate as boolean | undefined) ?? null;
 }
 
 export default async function ActivityDetailPage({ params }: PageProps) {
-  const [activityResult, participationsResult, myParticipationResult, currentUser] =
-    await Promise.all([
-      getActivityById(params.id),
-      getActivityParticipations(params.id),
-      getMyParticipationForActivity(params.id),
-      getCurrentUser(),
-    ]);
+  const { id } = await params;
+  const [activity, currentUser] = await Promise.all([
+    getActivityByIdFromDb(id),
+    getCurrentUser(),
+  ]);
+  if (!activity) notFound();
 
-  if (!activityResult.success || !activityResult.data) {
-    notFound();
-  }
-
-  const activity = activityResult.data;
-  const participations = participationsResult.success
-    ? participationsResult.data!
-    : { pending: [], approved: [] };
-  const myParticipation = myParticipationResult.success
-    ? myParticipationResult.data
-    : null;
-
-  const matchFeedbackResult = await getMyMatchFeedback(activity.id);
-  const myMatchFeedback = matchFeedbackResult.data?.accurate ?? null;
+  const isOrganizer = currentUser?.id === activity.organizer_id;
+  const [participations, myParticipation, matchMap, myMatchFeedback] = await Promise.all([
+    getParticipationsForActivity(activity.id),
+    currentUser ? getUserParticipation(activity.id, currentUser.id) : null,
+    isOrganizer ? {} : getMatchPercentages(currentUser, [activity]),
+    currentUser ? getMyMatchFeedback(activity.id, currentUser.id) : null,
+  ]);
 
   return (
     <ActivityDetailClient
       activity={activity}
       participations={participations}
-      myParticipation={myParticipation ?? null}
+      myParticipation={myParticipation}
       currentUserId={currentUser?.id ?? null}
-      isOrganizer={
-        currentUser ? activity.organizer_id === currentUser.id : false
-      }
+      isOrganizer={isOrganizer}
+      canEdit={isOrganizer && canEditActivity(activity)}
+      matchPercentage={(matchMap as Record<string, number>)[activity.id] ?? null}
       myMatchFeedback={myMatchFeedback}
     />
   );

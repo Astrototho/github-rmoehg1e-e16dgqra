@@ -34,6 +34,8 @@ interface PlaceAutocompleteProps {
   latName?: string;
   lngName?: string;
   required?: boolean;
+  // Favorise les résultats proches de ce point (ex. centre de la carte).
+  bias?: { latitude: number; longitude: number };
 }
 
 function formatLabel(feature: PhotonFeature): string {
@@ -56,6 +58,7 @@ export default function PlaceAutocomplete({
   latName,
   lngName,
   required,
+  bias,
 }: PlaceAutocompleteProps) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<PlaceResult | null>(null);
@@ -63,30 +66,53 @@ export default function PlaceAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
+  const biasLat = bias?.latitude;
+  const biasLng = bias?.longitude;
+
   useEffect(() => {
-    if (query.trim().length < 2) {
+    // Pas de recherche quand le champ affiche le lieu qui vient d'être choisi.
+    if (query.trim().length < 2 || selected?.label === query) {
       setResults([]);
       return;
     }
 
+    const controller = new AbortController();
     const timeout = setTimeout(async () => {
       setIsLoading(true);
       try {
         const params = new URLSearchParams({ q: query, limit: '5', lang: 'fr' });
         if (osmTag) params.set('osm_tag', osmTag);
-        const res = await fetch(`https://photon.komoot.io/api/?${params.toString()}`);
+        if (biasLat != null && biasLng != null) {
+          params.set('lat', biasLat.toFixed(4));
+          params.set('lon', biasLng.toFixed(4));
+        }
+        const res = await fetch(`https://photon.komoot.io/api/?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`Photon ${res.status}`);
         const data = await res.json();
-        setResults(data.features ?? []);
+        // Photon renvoie parfois plusieurs fois le même libellé : on dédoublonne.
+        const seen = new Set<string>();
+        const unique = ((data.features ?? []) as PhotonFeature[]).filter((f) => {
+          const label = formatLabel(f);
+          if (seen.has(label)) return false;
+          seen.add(label);
+          return true;
+        });
+        setResults(unique);
         setIsOpen(true);
-      } catch {
-        setResults([]);
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') setResults([]);
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     }, 350);
 
-    return () => clearTimeout(timeout);
-  }, [query, osmTag]);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [query, osmTag, biasLat, biasLng, selected]);
 
   const handleSelect = (feature: PhotonFeature) => {
     const label = formatLabel(feature);
@@ -112,6 +138,7 @@ export default function PlaceAutocomplete({
         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
           type="text"
+          enterKeyHint="search"
           name={name}
           value={query}
           onChange={(e) => {
@@ -146,7 +173,7 @@ export default function PlaceAutocomplete({
                 key={idx}
                 type="button"
                 onClick={() => handleSelect(feature)}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 {formatLabel(feature)}
               </button>
