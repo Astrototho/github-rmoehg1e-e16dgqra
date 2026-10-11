@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-PerfConnect — a Next.js 14 (App Router) mobile-first web app in French for finding sports activity partners. Users authenticate with Strava, browse/create activities ("sorties"), request to join, and message other participants. Backend is Supabase (Postgres).
+PerfConnect — a Next.js 15 (App Router, React 19) mobile-first web app in French for finding sports activity partners. Users authenticate with Strava, browse/create activities ("sorties"), request to join, and message other participants. Backend is Supabase (Postgres).
 
 ### Product vision
 
-SaaS that lets athletes propose sports outings (**trail** or **road cycling**) and **match** them with other users based on their sports performance (data pulled from Strava). Hosted on Vercel (production: https://rmoehg1e-e16dgqra.vercel.app/), database on the Supabase project "PerfConnect" (ref `cbvetcddlbibkvzqzbup`, eu-west-1).
+SaaS that lets athletes propose sports outings (**trail**, **running**, **road cycling** or **MTB**) and **match** them with other users based on their sports performance (data pulled from Strava). Hosted on Vercel (production: https://rmoehg1e-e16dgqra.vercel.app/), database on the Supabase project "PerfConnect" (ref `cbvetcddlbibkvzqzbup`, eu-west-1).
 
 Target user flow (zero friction):
-1. **Onboarding** — one-click Strava sign-in, nothing else: no email/password, no profile to fill in. The user's performance profile is computed in the background right after sign-in.
-2. **Proposing an outing** — "Proposer une sortie" button → simple form: sport (trail/vélo), date/time, place (autocomplete via Mapbox/Google), stats (km / D+). Submit, done.
+1. **Onboarding** — one-click Strava sign-in, nothing else: no email/password, no profile to fill in. The user's performance profile is computed in the background right after sign-in (`after()`), then refreshed at most once a day.
+2. **Proposing an outing** — "Proposer une sortie" button → simple form: sport, date/time, start place = a free-text name ("Fontaine au Lion") + a precise GPS point placed on a map, stats (km / D+), optional title (auto-generated when empty). Submit, done. Each organizer's start places are saved: retyping a known name (case/accents/spaces/punctuation ignored) fills the GPS point automatically.
 3. **Browsing** — the home feed is a social-network-style list of blocks. Each block shows: place, km and D+ (with a map image of the route as background), meeting date, sport, proposer's profile photo, and a **match percentage** between the proposer and the viewer. The match % is the killer feature and must be visible at first glance. Tapping a block opens the detail view (map, proposer's profile). (Age is no longer shown — see product decisions.)
 4. **Conversion** — "Participer" / "Matcher" button → the proposer gets a notification and accepts or refuses the participant.
 
@@ -22,16 +22,23 @@ Stack: Next.js (React + TypeScript) front, Next.js Server Actions back, Auth.js 
 
 - **Launch area**: Grenoble. **Business model**: free for now (growth first).
 - **Participants**: no cap per outing; the organizer manually accepts/refuses each participant.
-- **Feed**: filtered/sorted by **match percentage**; past outings (`start_date` in the past) must disappear from the feed.
+- **Sports**: exactly 4 — `trail`, `course-a-pied`, `velo-route`, `vtt` (the generic `velo` was removed; Strava `Ride` maps to `velo-route`).
+- **Feed**: sorted by **match percentage** (desc), then date; outings without a % go last; anonymous visitors see date order. Past and cancelled outings never appear in the feed.
+- **Editing / cancelling**: the organizer can edit everything or cancel an outing until **1 h before** its start (enforced server-side, also in the SQL `WHERE`); a new date must itself be ≥ 1 h in the future. Cancelling is a soft delete (`activities.status = 'cancelled'`, kept for stats/ML). Approved and pending participants get an in-app notification on edit and on cancel; approvals stay valid after an edit.
+- **Saved start places** (`saved_places`): private to each organizer, manageable (rename/delete) in Paramètres.
+- **Timezone**: every date is entered and displayed in **Europe/Paris** (`lib/dates.ts`) — never rely on the server (UTC on Vercel) or browser timezone.
 - **Block content**: the proposer's **age is removed** from the outing block (do not add a birth date to `profiles`).
-- **Map**: the block's background image shows the **starting point** of the outing (not the full route). Provider: the easiest and free option. Geocoding/autocomplete already uses Photon (OpenStreetMap, no key) in `PlaceAutocomplete`/`CityPicker`, so prefer an OSM-based solution (no paid Mapbox/Google) unless a keyless/free static image proves impractical.
+- **Map**: the block's background image shows the **starting point** of the outing (not the full route), built from raw OpenStreetMap tiles (`components/maps/StaticMap.tsx`, no key, no JS). Interactive maps (detail page, start-point picker) use Leaflet + OSM tiles; geocoding uses Photon (OSM, no key). No paid Mapbox/Google. OSM's tile usage policy only tolerates light traffic: switch to a dedicated tile provider before significant growth.
 - **Notifications**: in-app now (`notifications` table). Push notifications later, once the site becomes a real mobile app.
 - **Compute engine**: stays inside the Next.js app (simple, no separate service).
-- **Priorities (in order)**: 1) app stability, 2) decent UI (map, notifications), 3) turn the website into a real Android/iPhone app (PWA or native wrapper — approach still to be chosen).
+- **Priorities (in order)**: 1) app stability, 2) decent UI (map, notifications), 3) turn the website into a real Android/iPhone app. A first step is done: the site is an installable PWA (`app/manifest.ts`, generated icons, safe-area handling) — no service worker/offline mode yet.
 
-### Security TODO (later)
+### Security notes
 
-`strava_tokens.access_token` / `refresh_token` are stored in **clear text**. Encrypt them at rest later (e.g. app-level AES-GCM with a key in an env var, or Supabase Vault). Not done on purpose for now — do not forget it before opening to the public.
+- Strava tokens are **encrypted at rest** (AES-256-GCM, `lib/crypto.ts`, key in `STRAVA_TOKEN_ENCRYPTION_KEY`, stored as `v1.<iv>.<tag>.<data>`). Rows written before encryption are still read as plain text and re-encrypted on the next login/refresh. Losing or changing the key makes stored tokens unreadable (users just need to sign in again).
+- Since July 2026 Strava marks an API app **"Inactive"** (403 on every API call, even though OAuth still works) when its owner has no paid Strava subscription. Production uses app `283677` (owned by the co-founder's account). `auth.ts` refuses the sign-in when Strava returns no athlete profile instead of creating a ghost profile.
+- Every Server Action is a public HTTP endpoint: validate all arguments with `lib/validation.ts` (zod) — user IDs must match `isValidUserId` (digits only) before being used in a PostgREST filter such as `.or()`.
+- Legacy hand-made RLS policies that opened `messages`/`activities`/`participations` to the anon key were dropped (migration `012`). Never add write policies or policies on private tables.
 
 ### Matching roadmap: from hand-made formula to learned model
 
@@ -56,56 +63,63 @@ npm run dev     # start dev server (localhost:3000)
 npm run build   # production build
 npm run start   # run production build
 npm run lint    # next lint (eslint-config-next core-web-vitals)
+npm test        # Vitest (tests/*.test.ts): dates/timezone, 1 h rule, validation, crypto, feed sort, matching, static map
 ```
 
-There is no test suite configured in this repo (no test script, no test runner installed).
+Run a single test file with `npx vitest run tests/dates.test.ts`.
 
 ## Environment setup
 
 Copy `exampleOfenv.txt` to `.env.local` and fill in:
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - `AUTH_SECRET`, `AUTH_URL` (NextAuth)
-- `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET` (Strava OAuth app)
+- `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET` (Strava OAuth app — the same app works locally: Strava always accepts `localhost` callbacks)
+- `STRAVA_TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`, one per environment; must also be set on Vercel)
 
-`lib/supabase.ts` throws at import time if the public Supabase env vars are missing, and `lib/supabase-admin.ts` throws when `createAdminClient()` is called without the service role key.
+Do not run `vercel env pull .env.local`: the Vercel variables are marked "Sensitive" and come back empty, overwriting the local file. `lib/supabase-admin.ts` throws when `createAdminClient()` is called without the service role key.
 
 ## Architecture
 
-**Auth**: NextAuth v5 (beta) configured in [auth.ts](auth.ts) with a single Strava OAuth provider. The Strava athlete ID (`account.providerAccountId`) is used directly as the user's primary key — there is no separate internal user ID. On sign-in, the `signIn` callback upserts a row into Supabase `profiles` keyed by that Strava ID. The `authorized` callback in the same file is Next.js middleware's route gate: `/`, `/login`, `/api/auth/*`, and `/activities/[uuid]` are public; everything else requires a session. [middleware.ts](middleware.ts) just re-exports `auth` from `auth.ts` and matches all non-static/non-API routes.
+**Auth**: NextAuth v5 (beta) with a single Strava OAuth provider, split in two files: [auth.config.ts](auth.config.ts) is Edge-safe (provider, pages, `jwt`/`session` callbacks, and the `authorized` route gate used by [middleware.ts](middleware.ts): `/`, `/login`, `/legal`, `/api/auth/*`, PWA icons/manifest and `/activities/[uuid]` are public; everything else requires a session); [auth.ts](auth.ts) adds the Node-only `signIn` callback (profile upsert, encrypted token storage, background performance refresh). The Strava athlete ID (`account.providerAccountId`) is used directly as the user's primary key — there is no separate internal user ID. Auth errors redirect to `/login?error=…`, which shows a French message.
 
 **Data access layers** (all server-only, use `createAdminClient()` from [lib/supabase-admin.ts](lib/supabase-admin.ts) which uses the service-role key and bypasses RLS):
-- [lib/session.ts](lib/session.ts) — `getCurrentUser()` / `requireAuth()`: resolves the NextAuth session into an `AppUser` by reading the matching `profiles` row.
-- [lib/users.ts](lib/users.ts), [lib/activities.ts](lib/activities.ts) — read helpers for profiles/activities.
-- [app/actions.ts](app/actions.ts) — the bulk of the app's business logic lives here as Next.js Server Actions (`'use server'`): creating activities, requesting/approving/rejecting participation, sending/reading messages, building conversation previews. Every action re-checks `getCurrentUser()`/`requireAuth()` itself (no shared middleware-level auth for actions) and returns a `{ success, data? , error? }` shape rather than throwing.
+- [lib/session.ts](lib/session.ts) — `getCurrentUser()` (wrapped in React `cache()`: one session+profile read per request) / `requireAuth()`. A session whose ID is not a Strava ID, or whose profile no longer exists, counts as logged out.
+- Read helpers used while rendering server pages: [lib/users.ts](lib/users.ts), [lib/activities.ts](lib/activities.ts), [lib/participations.ts](lib/participations.ts), [lib/feed.ts](lib/feed.ts) (match %, distances, feed sort), [lib/conversations.ts](lib/conversations.ts), [lib/saved-places.ts](lib/saved-places.ts), [lib/notifications.ts](lib/notifications.ts), [lib/messages.ts](lib/messages.ts).
+- [app/actions.ts](app/actions.ts) — Server Actions (`'use server'`) called from client components only (mutations + chat polling): create/update/cancel activity, request/approve/reject participation, chat, match feedback, reports, profile location, saved places, account. Every action re-checks `getCurrentUser()` itself, validates its arguments (zod) and returns `{ success, data?, error? }` instead of throwing. Basic per-user rate limits live in [lib/rate-limit.ts](lib/rate-limit.ts).
+- Pure rules/helpers (unit-tested): [lib/activity-rules.ts](lib/activity-rules.ts) (1 h cutoff), [lib/dates.ts](lib/dates.ts) (Europe/Paris), [lib/places.ts](lib/places.ts) (place-name normalization, directions links), [lib/validation.ts](lib/validation.ts) + [lib/constraints.ts](lib/constraints.ts) (client-safe limits), [lib/sports.ts](lib/sports.ts), [lib/static-map.ts](lib/static-map.ts), [lib/crypto.ts](lib/crypto.ts).
+- [lib/background.ts](lib/background.ts) — `runInBackground()` wraps Next's `after()` for post-response work.
 
 **Matching & performance** (server-only):
-- [lib/strava.ts](lib/strava.ts) — Strava API calls (`fetchStravaActivities`, `refreshStravaAccessToken`).
-- [lib/performance.ts](lib/performance.ts) — maps Strava sport types to families, computes per-family indices (avg speed, moving time, elevation gain, "chill index") and stores them in `performance_profiles` (`refreshPerformanceProfile`, `getPerformanceProfilesForUsers`, `hasActivityScopeConnected`).
-- [lib/matching.ts](lib/matching.ts) — `computeMatchPercentage(viewer, organizer, viewerGeo, organizerGeo)`: weighted closeness of the 4 indices (equal weights 0.25 each, isolated in `WEIGHTS`) plus a geo **bonus only** (+5 same city, +2 same country, never a penalty). Returns `null` when either side has no performance profile for the sport.
+- [lib/strava.ts](lib/strava.ts) — Strava API calls (`fetchStravaActivities`, `refreshStravaAccessToken`, `deauthorizeStrava`). [lib/strava-tokens.ts](lib/strava-tokens.ts) — encrypted token storage and `getValidStravaAccessToken()` (auto-refresh).
+- [lib/performance.ts](lib/performance.ts) — maps Strava sport types to families, computes per-family indices (avg speed, moving time, elevation gain, "chill index") and stores them in `performance_profiles` (`refreshPerformanceProfile`, `refreshPerformanceProfileIfStale` — called in the background from the root layout, at most once per 24 h per user — `getPerformanceProfilesForUsers`, `hasActivityScopeConnected`).
+- [lib/matching.ts](lib/matching.ts) — `computeMatchPercentage(viewer, organizer, viewerGeo, organizerGeo)`: weighted closeness of the 4 indices (equal weights 0.25 each, isolated in `WEIGHTS`, formula version in `MATCHING_VERSION`) plus a geo **bonus only** (+5 same city, +2 same country, never a penalty). Returns `null` when either side has no performance profile for the sport. The % shown when a participation is requested is logged in `participations.match_percentage` / `matching_version` (training data).
 - [lib/notifications.ts](lib/notifications.ts), [lib/messages.ts](lib/messages.ts) — notification creation/reading and unread counters.
 
-**Database** (migrations in [supabase/migrations/](supabase/migrations/), `001`–`008`): `profiles.id` is text (the Strava athlete ID) and is the FK target for every user reference. RLS is enabled on **all** tables. Verified against the live Supabase project (schema `public`):
+**Database** (migrations in [supabase/migrations/](supabase/migrations/), `001`–`012`): `profiles.id` is text (the Strava athlete ID) and is the FK target for every user reference. RLS is enabled on **all** tables. Verified against the live Supabase project (schema `public`):
 
 | Table | Purpose / key columns |
 |---|---|
 | `profiles` | PK `id` (Strava ID), `name`, `avatar_url`, `email`, `bio`, `strava_username`, `city`, `country`, `latitude`, `longitude` |
-| `activities` | the outings: `title`, `type`, `start_date`, `location`, `distance`, `elevation`, `description`, `organizer_id` (FK profiles) + denormalized `organizer_name`/`organizer_avatar`, `latitude`, `longitude` |
-| `participations` | `activity_id`, `user_id`, `status` (`pending`/`approved`/`rejected`, default `pending`) |
+| `activities` | the outings: `title`, `type` (CHECK: 4 sports), `start_date`, `location` (start place name), `latitude`/`longitude` (start point), `distance`, `elevation`, `description`, `organizer_id` (FK profiles) + denormalized `organizer_name`/`organizer_avatar`, `status` (`active`/`cancelled`), `cancelled_at`, `updated_at` |
+| `participations` | `activity_id`, `user_id`, `status` (`pending`/`approved`/`rejected`, default `pending`), `match_percentage`, `matching_version` |
+| `saved_places` | organizers' saved start places: `user_id`, `name`, `name_normalized` (unique per user), `latitude`, `longitude` — private, service-role only |
 | `messages` | `sender_id`, `receiver_id`, denormalized `sender_name`/`sender_avatar`, `content`, `is_read` |
-| `notifications` | `user_id`, `type` (`message`/`participation_request`/`participation_approved`/`participation_rejected`), `title`, `body`, `link`, `is_read`, `related_id` |
-| `strava_tokens` | PK `user_id`, `access_token`, `refresh_token`, `expires_at`, `scope` — **sensitive**, service-role only |
-| `performance_profiles` | PK (`user_id`, `sport_family`), `avg_speed_mps`, `avg_moving_time_s`, `avg_elevation_gain_m`, `avg_chill_index`, `sample_size`, `computed_at`. `sport_family` ∈ trail, course-a-pied, velo-route, velo, vtt |
+| `notifications` | `user_id`, `type` (`message`/`participation_request`/`participation_approved`/`participation_rejected`/`activity_updated`/`activity_cancelled`), `title`, `body`, `link`, `is_read`, `related_id` |
+| `strava_tokens` | PK `user_id`, `access_token`, `refresh_token` (both AES-GCM encrypted), `expires_at`, `scope`, `last_profile_refresh_at` — **sensitive**, service-role only |
+| `performance_profiles` | PK (`user_id`, `sport_family`), `avg_speed_mps`, `avg_moving_time_s`, `avg_elevation_gain_m`, `avg_chill_index`, `sample_size`, `computed_at`. `sport_family` ∈ trail, course-a-pied, velo-route, vtt |
 | `match_feedback` | per-activity feedback on match quality: `activity_id`, `rater_id`, `rated_id`, `accurate` (bool) — service-role only |
 | `user_reports` | moderation reports: `activity_id`, `reporter_id`, `reported_id`, `reason`, `description` — strictly confidential, service-role only |
 
-Access policy: `profiles`/`activities`/`participations` have public SELECT policies; `messages`, `notifications`, `strava_tokens`, `performance_profiles`, `match_feedback` and `user_reports` have no policy (service-role client only, i.e. only through server code — never query them from the client with the anon key). Run migrations manually in the Supabase SQL editor (or via the Supabase MCP in Claude Code, after showing the SQL to the owner); there is no CLI-driven migration workflow in this repo. Always add a new numbered migration file in `supabase/migrations/` for any schema change so the repo stays the source of truth.
+Access policy: `profiles`/`activities`/`participations` have public SELECT policies only; `messages`, `notifications`, `strava_tokens`, `performance_profiles`, `saved_places`, `match_feedback` and `user_reports` have no policy (service-role client only, i.e. only through server code — never query them from the client with the anon key; the app has no anon/browser Supabase client at all). Apply migrations via the Supabase MCP in Claude Code (the owner authorized applying them directly) or the Supabase SQL editor; there is no CLI-driven migration workflow in this repo. Note: the local dev environment and production share this single Supabase project. Always add a new numbered migration file in `supabase/migrations/` for any schema change so the repo stays the source of truth.
 
-**Routing** ([app/](app/)): `/` (activity feed), `/activities`, `/activities/[id]`, `/create`, `/messages`, `/messages/[id]`, `/notifications`, `/profile`, `/settings`, `/legal`, `/login`; API routes `/api/auth/[...nextauth]` and `/api/set-user`. [app/layout.tsx](app/layout.tsx) renders a fixed mobile-width shell (top bar + bottom tab nav) around every page and calls `getCurrentUser()` server-side; it has `export const dynamic = 'force-dynamic'` so the whole app is rendered per-request (no static caching of the shell).
+**Routing** ([app/](app/)): `/` (activity feed), `/activities` (my outings, tabs), `/activities/[id]`, `/activities/[id]/edit`, `/create`, `/users/[id]` (public profile: sports + match %, never raw Strava data), `/messages`, `/messages/[id]` (polls every 5 s while visible), `/notifications`, `/profile`, `/settings`, `/legal`, `/login`; API route `/api/auth/[...nextauth]`; PWA routes `/manifest.webmanifest`, `/icon/[id]`, `/apple-icon`. Next 15: page `params`/`searchParams` are Promises (`await params`). [app/layout.tsx](app/layout.tsx) renders a mobile-width shell (top bar + [components/BottomNav.tsx](components/BottomNav.tsx)) and calls `getCurrentUser()` server-side; it has `export const dynamic = 'force-dynamic'`. `app/error.tsx`, `app/global-error.tsx` and `app/not-found.tsx` handle failures.
+
+**Mobile**: `viewport-fit=cover` + utilities in [app/globals.css](app/globals.css) — `pt-safe`/`pb-safe` (notch/home indicator), `pb-nav` (space for the bottom nav), `top-header` (sticky sub-headers under the top bar), `bottom-nav-offset` (sticky CTA above the nav). Inputs are forced to 16 px on phones (prevents the iOS focus zoom); use `min-h-dvh`/`dvh`, never `100vh`; keep tap targets ≥ 44 px. Leaflet maps must sit in a `relative z-0` wrapper so their panes don't cover sticky headers/modals.
+
+**Security headers** are set in [next.config.mjs](next.config.mjs) (frame-ancestors none, nosniff, referrer policy, permissions policy allowing geolocation for self, HSTS).
 
 **Path alias**: `@/*` maps to the repo root (see [tsconfig.json](tsconfig.json)), e.g. `@/lib/session`, `@/auth`.
 
-**Dead/stub components**: [components/UserSwitcher.tsx](components/UserSwitcher.tsx), [components/UserSwitcherWrapper.tsx](components/UserSwitcherWrapper.tsx), [context/UserContext.tsx](context/UserContext.tsx), and [app/client-layout.tsx](app/client-layout.tsx) are no-op stubs (return `null` or are empty) — leftovers from a mock multi-user switcher that predates real Strava auth. `UserSwitcher` is still imported and rendered in `app/layout.tsx` but renders nothing; the real sign-in/sign-out UI is [components/AuthButton.tsx](components/AuthButton.tsx), which is not currently wired into the layout. Don't build on top of these stubs without checking whether they're meant to be restored or removed.
-
-**UI components**: [components/ui/](components/ui/) holds small shadcn-style primitives (button, card, input, label, textarea) built on `class-variance-authority` + `tailwind-merge` via the `cn()` helper in [lib/utils.ts](lib/utils.ts). Feature components (`ActivityCard`, `ActivityDetailClient`, `ChatClient`, `PropositionForm`, `PlaceAutocomplete`, `CityPicker`, `MatchFeedbackPrompt`, `ReportUserButton`, `MessagesList`, `ProfileTabs`, …) live directly under `components/`.
+**UI components**: [components/ui/](components/ui/) holds small shadcn-style primitives (button, card, input, label, textarea) built on `class-variance-authority` + `tailwind-merge` via the `cn()` helper in [lib/utils.ts](lib/utils.ts). Feature components (`ActivityCard`, `ActivityDetailClient`, `ChatClient`, `PropositionForm` (create + edit), `StartPlacePicker`, `PlaceAutocomplete`, `CityPicker`, `SavedPlacesManager`, `MyActivitiesTabs`, `MatchFeedbackPrompt`, `ReportUserButton`, `MessagesList`, `ProfileTabs`, …) live directly under `components/`; map components under [components/maps/](components/maps/) (`StaticMap`, `LeafletMap`, `MapPickerModal`, `MapPin`). Client components must import limits from `lib/constraints.ts` (not `lib/validation.ts`, which pulls zod into the bundle).
 
 **Language**: UI copy, code comments, and error messages throughout the codebase are in French; keep new user-facing strings consistent with that.

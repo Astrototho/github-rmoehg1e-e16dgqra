@@ -1,12 +1,18 @@
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
 # NextAuth
 AUTH_SECRET=generate-with-openssl-rand-base64-32
 AUTH_URL=http://localhost:3000
 
+# Chiffrement des tokens Strava en base (AES-256-GCM)
+# Générer : openssl rand -base64 32 — une valeur différente par environnement.
+STRAVA_TOKEN_ENCRYPTION_KEY=
+
 # Strava OAuth (https://www.strava.com/settings/api)
+# ⚠️ Depuis juillet 2026, le propriétaire de l'app Strava doit avoir un
+# abonnement Strava actif, sinon l'API répond 403 "Application Inactive".
 AUTH_STRAVA_ID=your_client_id
 AUTH_STRAVA_SECRET=your_client_secret
