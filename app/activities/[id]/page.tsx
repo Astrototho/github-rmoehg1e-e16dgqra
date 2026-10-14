@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import ActivityDetailClient from '@/components/ActivityDetailClient';
 import { getActivityByIdFromDb } from '@/lib/activities';
-import { getParticipationsForActivity, getUserParticipation } from '@/lib/participations';
+import { getParticipationsForActivity } from '@/lib/participations';
 import { getMatchPercentages } from '@/lib/feed';
 import { getCurrentUser } from '@/lib/session';
 import { createAdminClient } from '@/lib/supabase-admin';
@@ -32,9 +32,8 @@ export default async function ActivityDetailPage({ params }: PageProps) {
   if (!activity) notFound();
 
   const isOrganizer = currentUser?.id === activity.organizer_id;
-  const [participations, myParticipation, matchMap, myMatchFeedback] = await Promise.all([
-    getParticipationsForActivity(activity.id),
-    currentUser ? getUserParticipation(activity.id, currentUser.id) : null,
+  const [{ mine: myParticipation, ...participations }, matchMap, myMatchFeedback] = await Promise.all([
+    getParticipationsForActivity(activity.id, currentUser?.id),
     isOrganizer ? {} : getMatchPercentages(currentUser, [activity]),
     currentUser ? getMyMatchFeedback(activity.id, currentUser.id) : null,
   ]);

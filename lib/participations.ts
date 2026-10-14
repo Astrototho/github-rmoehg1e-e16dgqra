@@ -1,42 +1,48 @@
 import { createAdminClient } from '@/lib/supabase-admin';
-import { DEFAULT_AVATAR, getUsersByIds } from '@/lib/users';
+import { DEFAULT_AVATAR } from '@/lib/users';
 import type { Participation, ParticipationWithUser } from '@/lib/types';
 
-async function enrichParticipations(
-  participations: Participation[]
-): Promise<ParticipationWithUser[]> {
-  const userIds = Array.from(new Set(participations.map((p) => p.user_id)));
-  const profiles = await getUsersByIds(userIds);
-  const profileMap = new Map(profiles.map((p) => [p.id, p]));
+// Le profil du participant est joint dans la même requête (FK
+// participations.user_id → profiles.id) : un seul aller-retour vers la base.
+const WITH_PROFILE = '*, profiles(name, avatar_url)';
 
-  return participations.map((p) => {
-    const profile = profileMap.get(p.user_id);
-    return {
-      ...p,
-      user_name: profile?.name ?? 'Utilisateur',
-      user_avatar: profile?.avatar_url ?? DEFAULT_AVATAR,
-    };
-  });
+type RowWithProfile = Participation & {
+  profiles: { name: string | null; avatar_url: string | null } | null;
+};
+
+function withUser(rows: RowWithProfile[]): ParticipationWithUser[] {
+  return rows.map(({ profiles, ...p }) => ({
+    ...p,
+    user_name: profiles?.name ?? 'Utilisateur',
+    user_avatar: profiles?.avatar_url ?? DEFAULT_AVATAR,
+  }));
 }
 
-export async function getParticipationsForActivity(activityId: string): Promise<{
+/** Participations d'une sortie ; `mine` évite une requête de plus sur la page détail. */
+export async function getParticipationsForActivity(
+  activityId: string,
+  viewerId?: string | null
+): Promise<{
   pending: ParticipationWithUser[];
   approved: ParticipationWithUser[];
+  mine: Participation | null;
 }> {
   const { data, error } = await createAdminClient()
     .from('participations')
-    .select('*')
+    .select(WITH_PROFILE)
     .eq('activity_id', activityId);
 
   if (error) {
     console.error('Erreur getParticipationsForActivity:', error);
-    return { pending: [], approved: [] };
+    return { pending: [], approved: [], mine: null };
   }
 
-  const participations = await enrichParticipations((data ?? []) as Participation[]);
+  const participations = withUser((data ?? []) as RowWithProfile[]);
+  const mine = viewerId ? participations.find((p) => p.user_id === viewerId) : undefined;
   return {
     pending: participations.filter((p) => p.status === 'pending'),
     approved: participations.filter((p) => p.status === 'approved'),
+    mine: mine ?? null,
   };
 }
 
@@ -65,7 +71,7 @@ export async function getApprovedParticipantsForActivities(
 
   const { data, error } = await createAdminClient()
     .from('participations')
-    .select('*')
+    .select(WITH_PROFILE)
     .in('activity_id', activityIds)
     .eq('status', 'approved');
 
@@ -74,7 +80,7 @@ export async function getApprovedParticipantsForActivities(
     return {};
   }
 
-  const enriched = await enrichParticipations((data ?? []) as Participation[]);
+  const enriched = withUser((data ?? []) as RowWithProfile[]);
   const map: Record<string, ParticipationWithUser[]> = {};
   for (const p of enriched) {
     (map[p.activity_id] ??= []).push(p);

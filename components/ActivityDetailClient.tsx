@@ -110,11 +110,7 @@ export default function ActivityDetailClient({
     const result = await cancelActivity(activity.id);
     setIsCancelling(false);
     setConfirmingCancel(false);
-    if (result.success) {
-      router.refresh();
-    } else {
-      setError(result.error);
-    }
+    if (!result.success) setError(result.error);
   };
 
   return (

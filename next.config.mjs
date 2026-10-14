@@ -23,6 +23,11 @@ const securityHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // Revenir sur un onglet déjà visité dans les 30 s réutilise son rendu au
+    // lieu de tout redemander au serveur (les actions invalident ce cache).
+    staleTimes: { dynamic: 30 },
+  },
   // Un package-lock.json existe dans le dossier parent : on fixe la racine du
   // projet pour que Next ne la devine pas de travers.
   outputFileTracingRoot: dirname(fileURLToPath(import.meta.url)),

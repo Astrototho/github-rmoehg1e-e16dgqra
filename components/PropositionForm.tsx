@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { MapPin, Calendar, TrendingUp, AlertCircle } from 'lucide-react';
 import { createActivity, updateActivity } from '@/app/actions';
 import StartPlacePicker from '@/components/StartPlacePicker';
@@ -35,7 +34,6 @@ export default function PropositionForm({
   activity,
 }: PropositionFormProps) {
   const isEdit = !!activity;
-  const router = useRouter();
   const errorRef = useRef<HTMLDivElement>(null);
   const [sport, setSport] = useState<ActivityType>(
     (SPORTS.find((s) => s.value === activity?.type)?.value as ActivityType) ?? 'trail'
@@ -77,12 +75,7 @@ export default function PropositionForm({
       ? await updateActivity(activity.id, formData)
       : await createActivity(formData);
 
-    if (result.success && result.data) {
-      router.push(`/activities/${result.data.id}`);
-      router.refresh();
-      return;
-    }
-
+    // En cas de succès, l'action redirige directement vers la sortie.
     setIsSubmitting(false);
     showError(result.success ? 'Une erreur inattendue est survenue.' : result.error);
   };

@@ -63,6 +63,10 @@ export default async function RootLayout({
 
   return (
     <html lang="fr">
+      <head>
+        {/* Tuiles des cartes : connexion ouverte avant le premier rendu. */}
+        <link rel="preconnect" href="https://tile.openstreetmap.org" crossOrigin="" />
+      </head>
       <body className={`${inter.className} bg-gray-50 text-slate-900 antialiased`}>
         {/* Conteneur mobile (largeur de téléphone, centré sur ordinateur) */}
         <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col bg-white shadow-2xl">
