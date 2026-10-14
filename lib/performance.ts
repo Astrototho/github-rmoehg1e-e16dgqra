@@ -2,47 +2,95 @@ import { createAdminClient } from '@/lib/supabase-admin';
 import { fetchStravaActivities, type StravaActivitySummary } from '@/lib/strava';
 import { getValidStravaAccessToken } from '@/lib/strava-tokens';
 import type { ActivityType } from '@/lib/sports';
+import { effortKm } from '@/lib/effort';
+import { isValidUserId } from '@/lib/validation';
 
 // Correspondance type Strava → famille de sport interne à l'app.
-// Isolée pour être ajustable sans toucher au reste du calcul.
+// Isolée pour être ajustable sans toucher au reste du calcul. Vélos à
+// assistance électrique, home-trainer virtuel, vélomobile et handbike sont
+// volontairement absents : ils fausseraient le rythme.
 export const SPORT_TYPE_TO_FAMILY: Record<string, ActivityType> = {
   Run: 'course-a-pied',
   TrailRun: 'trail',
   MountainBikeRide: 'vtt',
-  EMountainBikeRide: 'vtt',
   GravelRide: 'velo-route',
   Ride: 'velo-route',
-  VirtualRide: 'velo-route',
-  EBikeRide: 'velo-route',
-  Handcycle: 'velo-route',
-  Velomobile: 'velo-route',
 };
+
+const EXCLUDED_SPORT_TYPES = new Set([
+  'EBikeRide',
+  'EMountainBikeRide',
+  'VirtualRide',
+  'VirtualRun',
+  'Velomobile',
+  'Handcycle',
+]);
 
 // Sous ce seuil d'activités pour une famille de sport, on considère qu'il n'y
 // a pas assez de données pour un score fiable.
 const MIN_ACTIVITIES_PER_FAMILY = 2;
+// Activités trop courtes (échauffement, test de montre) ignorées.
+const MIN_MOVING_TIME_S = 10 * 60;
+// En course à pied, sous 6,5 km/h il s'agit de marche.
+const MIN_RUN_SPEED_MPS = 6.5 / 3.6;
 
 // Le profil est recalculé au plus une fois par jour (appels API Strava limités).
 const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// Données dérivées de Strava : conservées 48 h au plus (règles de l'API
+// Strava), puis ignorées et purgées.
+export const PROFILE_TTL_MS = 48 * 60 * 60 * 1000;
+// Version du calcul : un profil d'une version antérieure est recalculé à la
+// visite suivante, sans attendre 24 h.
+export const PROFILE_VERSION = 'v2';
+// Après un échec (quota, réseau), nouvel essai possible au bout d'1 h.
+const RETRY_AFTER_FAILURE_MS = 60 * 60 * 1000;
 
 export interface SportFamilyIndices {
   sportFamily: ActivityType;
-  avgSpeedMps: number;
+  /** Rythme corrigé du dénivelé : km-effort par heure de mouvement (médiane). */
+  effortSpeedKmh: number;
+  /** Durée habituelle d'une sortie, en secondes (médiane). */
   avgMovingTimeS: number;
-  avgElevationGainM: number;
-  avgChillIndex: number; // part du temps arrêté / temps total, 0..1
+  /** Profil de terrain : mètres de D+ par km (médiane). */
+  climbMPerKm: number;
+  /** Part du temps passé à l'arrêt, 0..1 (médiane) : style "pauses". */
+  avgChillIndex: number;
+  /** Capacité : 90e centile des km-effort et du D+ par sortie. */
+  p90EffortKm: number;
+  p90ElevationGainM: number;
   sampleSize: number;
 }
 
 export function mapToSportFamily(
   activity: StravaActivitySummary
 ): ActivityType | null {
+  if (EXCLUDED_SPORT_TYPES.has(activity.sport_type)) return null;
   return (
     SPORT_TYPE_TO_FAMILY[activity.sport_type] ??
     SPORT_TYPE_TO_FAMILY[activity.type] ??
     null
   );
 }
+
+/** Activité exploitable pour le profil (filtres de qualité). */
+export function isUsableActivity(activity: StravaActivitySummary, family: ActivityType): boolean {
+  if (activity.trainer || activity.commute || activity.manual) return false;
+  if (!activity.elapsed_time || activity.elapsed_time <= 0) return false;
+  if (!activity.moving_time || activity.moving_time < MIN_MOVING_TIME_S) return false;
+  if (!activity.distance || activity.distance <= 0) return false;
+  if (family === 'course-a-pied' && activity.average_speed < MIN_RUN_SPEED_MPS) return false;
+  return true;
+}
+
+function quantile(values: number[], q: number): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+const median = (values: number[]) => quantile(values, 0.5);
 
 export function computeIndicesBySportFamily(
   activities: StravaActivitySummary[]
@@ -51,9 +99,7 @@ export function computeIndicesBySportFamily(
 
   for (const activity of activities) {
     const family = mapToSportFamily(activity);
-    if (!family || !activity.elapsed_time || activity.elapsed_time <= 0) {
-      continue;
-    }
+    if (!family || !isUsableActivity(activity, family)) continue;
     const group = groups.get(family) ?? [];
     group.push(activity);
     groups.set(family, group);
@@ -63,19 +109,23 @@ export function computeIndicesBySportFamily(
   for (const [sportFamily, acts] of Array.from(groups.entries())) {
     if (acts.length < MIN_ACTIVITIES_PER_FAMILY) continue;
 
-    const n = acts.length;
+    const efforts = acts.map((a) =>
+      effortKm(sportFamily, a.distance / 1000, a.total_elevation_gain || 0)
+    );
     result.push({
       sportFamily,
-      avgSpeedMps: acts.reduce((sum, a) => sum + a.average_speed, 0) / n,
-      avgMovingTimeS: acts.reduce((sum, a) => sum + a.moving_time, 0) / n,
-      avgElevationGainM:
-        acts.reduce((sum, a) => sum + a.total_elevation_gain, 0) / n,
-      avgChillIndex:
-        acts.reduce(
-          (sum, a) => sum + (a.elapsed_time - a.moving_time) / a.elapsed_time,
-          0
-        ) / n,
-      sampleSize: n,
+      effortSpeedKmh: median(acts.map((a, i) => efforts[i] / (a.moving_time / 3600))),
+      avgMovingTimeS: median(acts.map((a) => a.moving_time)),
+      climbMPerKm: median(acts.map((a) => (a.total_elevation_gain || 0) / (a.distance / 1000))),
+      avgChillIndex: median(
+        acts.map((a) => Math.max(0, a.elapsed_time - a.moving_time) / a.elapsed_time)
+      ),
+      p90EffortKm: quantile(efforts, 0.9),
+      p90ElevationGainM: quantile(
+        acts.map((a) => a.total_elevation_gain || 0),
+        0.9
+      ),
+      sampleSize: acts.length,
     });
   }
 
@@ -87,13 +137,13 @@ export async function refreshPerformanceProfile(
   accessToken: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const activities = await fetchStravaActivities(accessToken, 30);
+    const activities = await fetchStravaActivities(accessToken);
     const indices = computeIndicesBySportFamily(activities);
     const admin = createAdminClient();
 
     // On repart d'une base propre à chaque rafraîchissement : si une famille
     // de sport n'a plus assez de données récentes, on retire l'ancienne ligne
-    // plutôt que de laisser un score périmé (au plus 5 lignes/utilisateur).
+    // plutôt que de laisser un score périmé (au plus 4 lignes/utilisateur).
     await admin.from('performance_profiles').delete().eq('user_id', userId);
 
     if (indices.length > 0) {
@@ -101,10 +151,15 @@ export async function refreshPerformanceProfile(
         indices.map((i) => ({
           user_id: userId,
           sport_family: i.sportFamily,
-          avg_speed_mps: i.avgSpeedMps,
+          // Colonnes v1 (NOT NULL) gardées pour compatibilité.
+          avg_speed_mps: i.effortSpeedKmh / 3.6,
           avg_moving_time_s: i.avgMovingTimeS,
-          avg_elevation_gain_m: i.avgElevationGainM,
+          avg_elevation_gain_m: i.p90ElevationGainM,
           avg_chill_index: i.avgChillIndex,
+          effort_speed_kmh: i.effortSpeedKmh,
+          climb_m_per_km: i.climbMPerKm,
+          p90_effort_km: i.p90EffortKm,
+          p90_elevation_gain_m: i.p90ElevationGainM,
           sample_size: i.sampleSize,
           computed_at: new Date().toISOString(),
         })),
@@ -116,13 +171,39 @@ export async function refreshPerformanceProfile(
     return { success: true };
   } catch (err) {
     console.error('Erreur refreshPerformanceProfile:', err);
-    return { success: false, error: String(err) };
-  } finally {
+    // Nouvel essai possible dans 1 h au lieu de 24 h.
     await createAdminClient()
       .from('strava_tokens')
-      .update({ last_profile_refresh_at: new Date().toISOString() })
+      .update({
+        last_profile_refresh_at: new Date(
+          Date.now() - PROFILE_MAX_AGE_MS + RETRY_AFTER_FAILURE_MS
+        ).toISOString(),
+      })
       .eq('user_id', userId);
+    return { success: false, error: String(err) };
   }
+}
+
+/**
+ * Réserve le rafraîchissement de façon atomique : une seule requête (même
+ * si plusieurs rendus arrivent en même temps) obtient le droit d'appeler
+ * Strava, au plus une fois par 24 h (ou tout de suite après un changement
+ * de version du calcul).
+ */
+async function claimProfileRefresh(userId: string): Promise<boolean> {
+  const staleBefore = new Date(Date.now() - PROFILE_MAX_AGE_MS).toISOString();
+  const { data, error } = await createAdminClient()
+    .from('strava_tokens')
+    .update({
+      last_profile_refresh_at: new Date().toISOString(),
+      profile_version: PROFILE_VERSION,
+    })
+    .eq('user_id', userId)
+    .or(
+      `last_profile_refresh_at.is.null,last_profile_refresh_at.lt.${staleBefore},profile_version.is.null,profile_version.neq.${PROFILE_VERSION}`
+    )
+    .select('user_id');
+  return !error && (data?.length ?? 0) > 0;
 }
 
 /**
@@ -130,21 +211,26 @@ export async function refreshPerformanceProfile(
  * 24 h. Pensé pour être lancé en tâche de fond (runInBackground).
  */
 export async function refreshPerformanceProfileIfStale(userId: string) {
-  const { data, error } = await createAdminClient()
-    .from('strava_tokens')
-    .select('last_profile_refresh_at')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error || !data) return;
-
-  const last = data.last_profile_refresh_at
-    ? new Date(data.last_profile_refresh_at).getTime()
-    : 0;
-  if (Date.now() - last < PROFILE_MAX_AGE_MS) return;
+  if (!isValidUserId(userId)) return;
+  if (!(await claimProfileRefresh(userId))) return;
 
   const accessToken = await getValidStravaAccessToken(userId);
   if (!accessToken) return;
   await refreshPerformanceProfile(userId, accessToken);
+}
+
+/**
+ * Rafraîchit en tâche de fond les profils de plusieurs utilisateurs (ex. les
+ * organisateurs du fil) et purge les profils expirés.
+ */
+export async function refreshProfilesInBackground(userIds: string[], max = 5) {
+  await createAdminClient()
+    .from('performance_profiles')
+    .delete()
+    .lt('computed_at', new Date(Date.now() - PROFILE_TTL_MS).toISOString());
+  for (const id of userIds.slice(0, max)) {
+    await refreshPerformanceProfileIfStale(id);
+  }
 }
 
 export async function getPerformanceProfilesForUsers(
@@ -154,8 +240,12 @@ export async function getPerformanceProfilesForUsers(
 
   const { data, error } = await createAdminClient()
     .from('performance_profiles')
-    .select('*')
-    .in('user_id', userIds);
+    .select(
+      'user_id, sport_family, effort_speed_kmh, avg_moving_time_s, climb_m_per_km, avg_chill_index, p90_effort_km, p90_elevation_gain_m, sample_size'
+    )
+    .in('user_id', userIds)
+    .not('effort_speed_kmh', 'is', null)
+    .gt('computed_at', new Date(Date.now() - PROFILE_TTL_MS).toISOString());
 
   if (error || !data) return {};
 
@@ -164,10 +254,12 @@ export async function getPerformanceProfilesForUsers(
     const list = map[row.user_id] ?? [];
     list.push({
       sportFamily: row.sport_family,
-      avgSpeedMps: row.avg_speed_mps,
-      avgMovingTimeS: row.avg_moving_time_s,
-      avgElevationGainM: row.avg_elevation_gain_m,
-      avgChillIndex: row.avg_chill_index,
+      effortSpeedKmh: Number(row.effort_speed_kmh),
+      avgMovingTimeS: Number(row.avg_moving_time_s),
+      climbMPerKm: Number(row.climb_m_per_km),
+      avgChillIndex: Number(row.avg_chill_index),
+      p90EffortKm: Number(row.p90_effort_km),
+      p90ElevationGainM: Number(row.p90_elevation_gain_m),
       sampleSize: row.sample_size,
     });
     map[row.user_id] = list;

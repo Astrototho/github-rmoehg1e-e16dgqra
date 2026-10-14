@@ -11,14 +11,22 @@ export interface StravaActivitySummary {
   total_elevation_gain: number; // mètres
   average_speed: number; // m/s
   start_date: string;
+  trainer?: boolean;
+  commute?: boolean;
+  manual?: boolean;
 }
 
+/**
+ * Activités récentes de l'athlète (une seule requête : 200 activités au plus
+ * sur la période, le même coût de quota que 30).
+ */
 export async function fetchStravaActivities(
   accessToken: string,
-  perPage = 30
+  { perPage = 200, afterDays = 120 }: { perPage?: number; afterDays?: number } = {}
 ): Promise<StravaActivitySummary[]> {
+  const after = Math.floor(Date.now() / 1000) - afterDays * 24 * 60 * 60;
   const res = await fetch(
-    `${STRAVA_API_BASE}/athlete/activities?per_page=${perPage}`,
+    `${STRAVA_API_BASE}/athlete/activities?per_page=${perPage}&after=${after}`,
     {
       headers: { Authorization: `Bearer ${accessToken}` },
       cache: 'no-store',

@@ -34,7 +34,7 @@ export default async function ActivityDetailPage({ params }: PageProps) {
   const isOrganizer = currentUser?.id === activity.organizer_id;
   const [{ mine: myParticipation, ...participations }, matchMap, myMatchFeedback] = await Promise.all([
     getParticipationsForActivity(activity.id, currentUser?.id),
-    isOrganizer ? {} : getMatchPercentages(currentUser, [activity]),
+    isOrganizer ? null : getMatchPercentages(currentUser, [activity]),
     currentUser ? getMyMatchFeedback(activity.id, currentUser.id) : null,
   ]);
 
@@ -46,7 +46,8 @@ export default async function ActivityDetailPage({ params }: PageProps) {
       currentUserId={currentUser?.id ?? null}
       isOrganizer={isOrganizer}
       canEdit={isOrganizer && canEditActivity(activity)}
-      matchPercentage={(matchMap as Record<string, number>)[activity.id] ?? null}
+      matchPercentage={matchMap?.[activity.id]?.percentage ?? null}
+      matchHint={matchMap?.[activity.id]?.hint}
       myMatchFeedback={myMatchFeedback}
     />
   );

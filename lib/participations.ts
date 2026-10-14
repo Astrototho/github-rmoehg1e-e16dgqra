@@ -102,3 +102,25 @@ export async function getParticipantIdsToNotify(activityId: string): Promise<str
   }
   return (data ?? []).map((row) => row.user_id as string);
 }
+
+/** Statut de la demande du visiteur pour chaque sortie (badge sur le fil). */
+export async function getViewerParticipationStatuses(
+  userId: string,
+  activityIds: string[]
+): Promise<Record<string, 'pending' | 'approved'>> {
+  if (activityIds.length === 0) return {};
+  const { data, error } = await createAdminClient()
+    .from('participations')
+    .select('activity_id, status')
+    .eq('user_id', userId)
+    .in('activity_id', activityIds)
+    .in('status', ['pending', 'approved']);
+
+  if (error) {
+    console.error('Erreur getViewerParticipationStatuses:', error);
+    return {};
+  }
+  return Object.fromEntries(
+    (data ?? []).map((row) => [row.activity_id as string, row.status as 'pending' | 'approved'])
+  );
+}

@@ -11,6 +11,7 @@ import { signIn } from '@/auth';
 import { signOutAction } from '@/app/actions';
 import LocationSettings from '@/components/LocationSettings';
 import DeleteAccountButton from '@/components/DeleteAccountButton';
+import PoweredByStrava from '@/components/PoweredByStrava';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,6 +125,7 @@ export default async function SettingsPage() {
           </form>
           <DeleteAccountButton />
         </section>
+        <PoweredByStrava className="py-2" />
       </div>
     </div>
   );

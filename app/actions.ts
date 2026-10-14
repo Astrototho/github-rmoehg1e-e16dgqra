@@ -405,7 +405,7 @@ export async function requestParticipation(activityId: string): Promise<ActionRe
       getUserParticipation(activityId, currentUser.id),
     ]);
     const matchLog = {
-      match_percentage: matchMap[activity.id] ?? null,
+      match_percentage: matchMap[activity.id]?.percentage ?? null,
       matching_version: MATCHING_VERSION,
     };
 

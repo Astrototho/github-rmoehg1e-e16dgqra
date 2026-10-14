@@ -150,3 +150,41 @@ export function formatRelativeDay(
   if (day === yesterday) return 'Hier';
   return fallback(value);
 }
+
+/** "8h30" (sans zéro initial). */
+function shortTime(value: string | Date): string {
+  return format(value, { hour: 'numeric', minute: '2-digit' }).replace(':', 'h');
+}
+
+export type RelativeStartTone = 'past' | 'soon' | 'normal';
+
+/**
+ * Date de départ lisible d'un coup d'œil, à l'heure de Paris :
+ * "Dans 45 min · 18h30", "Aujourd'hui · 18h30", "Demain · 8h30",
+ * "Samedi · 8h30", puis "Sam. 25 oct. · 8h30" au-delà d'une semaine.
+ */
+export function formatRelativeStart(
+  value: string | Date,
+  now: Date = new Date()
+): { label: string; tone: RelativeStartTone } {
+  const start = new Date(value);
+  const diffMin = Math.round((start.getTime() - now.getTime()) / 60000);
+  const time = shortTime(start);
+  if (diffMin <= 0) return { label: 'En cours', tone: 'past' };
+  if (diffMin < 60) return { label: `Dans ${diffMin} min · ${time}`, tone: 'soon' };
+  if (diffMin < 180) return { label: `Dans ${Math.floor(diffMin / 60)} h · ${time}`, tone: 'soon' };
+
+  const day = parisDayKey(start);
+  const today = parisDayKey(now);
+  const dayDiff = Math.round(
+    (Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000
+  );
+  if (dayDiff === 0) return { label: `Aujourd'hui · ${time}`, tone: 'normal' };
+  if (dayDiff === 1) return { label: `Demain · ${time}`, tone: 'normal' };
+  if (dayDiff < 7) {
+    const weekday = format(start, { weekday: 'long' });
+    return { label: `${weekday[0].toUpperCase()}${weekday.slice(1)} · ${time}`, tone: 'normal' };
+  }
+  const short = format(start, { weekday: 'short', day: 'numeric', month: 'short' });
+  return { label: `${short[0].toUpperCase()}${short.slice(1)} · ${time}`, tone: 'normal' };
+}
