@@ -1,5 +1,6 @@
 'use client';
 
+import { locateUser } from '@/lib/geolocation-client';
 import { useState } from 'react';
 import { Locate, Loader2, CheckCircle2 } from 'lucide-react';
 import PlaceAutocomplete, { type PlaceResult } from '@/components/PlaceAutocomplete';
@@ -53,39 +54,25 @@ export default function CityPicker({
     await save(city, place.country, place.latitude, place.longitude);
   };
 
-  const handleLocate = () => {
-    if (!navigator.geolocation) {
-      setError("La géolocalisation n'est pas disponible sur cet appareil.");
-      return;
-    }
-
+  const handleLocate = async () => {
     setIsLocating(true);
     setError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        try {
-          const res = await fetch(
-            `https://photon.komoot.io/reverse?lon=${longitude}&lat=${latitude}&lang=fr`
-          );
-          const data = await res.json();
-          const feature = data.features?.[0];
-          const city =
-            feature?.properties?.city ?? feature?.properties?.name ?? 'Position actuelle';
-          const country = feature?.properties?.country ?? null;
-          await save(city, country, latitude, longitude);
-        } catch {
-          setError('Impossible de déterminer ta ville à partir de ta position.');
-        } finally {
-          setIsLocating(false);
-        }
-      },
-      () => {
-        setError('Localisation refusée ou indisponible.');
-        setIsLocating(false);
-      }
-    );
+    try {
+      const { latitude, longitude } = await locateUser();
+      const res = await fetch(
+        `https://photon.komoot.io/reverse?lon=${longitude}&lat=${latitude}&lang=fr`
+      );
+      const data = await res.json();
+      const feature = data.features?.[0];
+      const city = feature?.properties?.city ?? feature?.properties?.name ?? 'Position actuelle';
+      const country = feature?.properties?.country ?? null;
+      await save(city, country, latitude, longitude);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Localisation indisponible.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   return (

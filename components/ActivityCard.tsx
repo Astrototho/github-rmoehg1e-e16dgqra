@@ -138,12 +138,12 @@ export default function ActivityCard({ activity, href, badge, anonymous }: Activ
       }`}
     >
       {/* Point de départ */}
-      <div className="relative h-32 overflow-hidden bg-gradient-to-br from-brand-100 to-brand-50">
+      <div className="relative h-36 overflow-hidden bg-gradient-to-br from-brand-100 to-brand-50">
         {hasCoords ? (
           <StaticMap
             latitude={Number(activity.latitude)}
             longitude={Number(activity.longitude)}
-            halfHeight={64}
+            halfHeight={72}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
@@ -153,53 +153,59 @@ export default function ActivityCard({ activity, href, badge, anonymous }: Activ
             <span className="text-xs text-gray-600">Point de départ à préciser</span>
           </div>
         )}
-        <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-          <span className="flex h-7 items-center gap-1.5 rounded-full bg-white/95 px-2.5 text-[13px] font-semibold text-gray-900 shadow-sm">
-            <span aria-hidden="true">{getSportEmoji(sport)}</span>
-            {getSportLabel(sport)}
+        <span className="absolute left-3 top-3 flex h-7 items-center gap-1.5 rounded-full bg-white/95 px-2.5 text-[13px] font-semibold text-gray-900 shadow-sm">
+          <span aria-hidden="true">{getSportEmoji(sport)}</span>
+          {getSportLabel(sport)}
+        </span>
+        {activity.distanceFromViewerKm != null && (
+          <span className="absolute bottom-2 left-3 flex h-7 items-center gap-1 rounded-full bg-white/95 px-2.5 text-[13px] font-semibold text-gray-900 shadow-sm">
+            <Navigation className="h-3.5 w-3.5 text-gray-500" aria-hidden="true" />
+            à {numberFormat.format(activity.distanceFromViewerKm)} km
           </span>
-          {activity.distanceFromViewerKm != null && (
-            <span className="flex h-7 items-center gap-1 rounded-full bg-white/95 px-2.5 text-[13px] font-semibold text-gray-900 shadow-sm">
-              <Navigation className="h-3.5 w-3.5 text-gray-500" aria-hidden="true" />
-              à {numberFormat.format(activity.distanceFromViewerKm)} km
+        )}
+        {/* % de match : la donnée clé, visible au premier coup d'œil */}
+        {activity.matchPercentage != null ? (
+          <div className="absolute right-3 top-3 flex flex-col items-center rounded-2xl bg-brand-600 px-3.5 py-2 text-white shadow-lg ring-2 ring-white">
+            <span className="text-[34px] font-black leading-none tabular-nums">
+              {activity.matchPercentage}
+              <span className="text-lg font-extrabold">%</span>
             </span>
-          )}
-        </div>
+            <span className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/90">
+              match
+            </span>
+          </div>
+        ) : anonymous ? (
+          <div className="absolute right-3 top-3 flex flex-col items-center rounded-2xl bg-white/95 px-3 py-2 text-gray-500 shadow-lg">
+            <span className="flex items-center gap-1 text-2xl font-black leading-none">
+              ?? %<Lock className="h-3.5 w-3.5" aria-hidden="true" />
+            </span>
+            <span className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.12em]">match</span>
+          </div>
+        ) : null}
         {hasCoords && <OsmAttribution className="absolute bottom-1 right-1" />}
       </div>
 
       <div className="px-4 pb-4">
-        {/* Organisateur et % de match : la donnée clé */}
-        <div className="-mt-8 flex items-end justify-between gap-2">
-          <div className="flex min-w-0 items-end gap-2.5">
-            <MatchRing avatar={activity.organizer_avatar} percentage={activity.matchPercentage} />
-            <div className="min-w-0 pb-0.5">
-              {activity.matchPercentage != null ? (
-                <p className="leading-none text-gray-900">
-                  <span className="text-[28px] font-black tabular-nums">
-                    {activity.matchPercentage}
-                  </span>
-                  <span className="text-base font-bold"> %</span>
-                </p>
-              ) : anonymous ? (
-                <p className="flex items-center gap-1 text-[22px] font-black leading-none text-gray-300">
-                  ?? %<Lock className="h-3.5 w-3.5" aria-hidden="true" />
-                </p>
-              ) : (
-                <p className="text-[22px] font-black leading-none text-gray-300">— %</p>
-              )}
-              <p className="mt-1 truncate text-xs text-gray-600">
+        {/* Organisateur : seul l'avatar chevauche la carte */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="-mt-7">
+              <MatchRing avatar={activity.organizer_avatar} percentage={activity.matchPercentage} />
+            </div>
+            <div className="min-w-0 pt-1.5">
+              <p className="truncate text-sm font-bold text-gray-900">{organizer}</p>
+              <p className="truncate text-xs text-gray-600">
                 {anonymous
-                  ? 'Ton match : connecte-toi'
-                  : activity.matchPercentage != null
-                    ? `match avec ${organizer}`
-                    : `avec ${organizer}`}
+                  ? 'Connecte-toi pour voir ton match'
+                  : activity.matchPercentage == null
+                    ? 'Match indisponible pour ce sport'
+                    : 'Organisateur'}
               </p>
             </div>
           </div>
           {statusBadge && (
             <span
-              className={`mb-1 flex h-7 flex-shrink-0 items-center gap-1 rounded-full px-2.5 text-xs font-bold ring-1 ${BADGE_TONES[statusBadge.tone]}`}
+              className={`mt-2 flex h-7 flex-shrink-0 items-center gap-1 rounded-full px-2.5 text-xs font-bold ring-1 ${BADGE_TONES[statusBadge.tone]}`}
             >
               {statusBadge.tone === 'success' && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
               {statusBadge.tone === 'warning' && <Clock className="h-3.5 w-3.5" aria-hidden="true" />}

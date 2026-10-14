@@ -17,13 +17,9 @@ import {
   sortFeed,
 } from '@/lib/feed';
 import {
-  RADIUS_OPTIONS,
-  WHEN_OPTIONS,
   applyFeedFilters,
   parseFeedFilters,
-  type FeedFilters as Filters,
 } from '@/lib/feed-filters';
-import { SPORTS } from '@/lib/sports';
 import { getCurrentUser } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -50,28 +46,21 @@ export default async function Home({ searchParams }: HomeProps) {
 
   // Point de référence pour les distances : position GPS récente, sinon la
   // ville du profil.
-  const reference =
-    parsePositionCookie(cookieStore.get('pc_pos')?.value) ??
-    (currentUser?.latitude != null && currentUser.longitude != null
+  const gps = parsePositionCookie(cookieStore.get('pc_pos')?.value);
+  const profilePoint =
+    currentUser?.latitude != null && currentUser.longitude != null
       ? { latitude: Number(currentUser.latitude), longitude: Number(currentUser.longitude) }
-      : null);
+      : null;
+  const reference = gps ?? profilePoint;
+  const referenceLabel = gps
+    ? 'ta position actuelle'
+    : profilePoint
+      ? currentUser?.city ?? 'ta ville'
+      : null;
   const distanceMap = getDistancesFromViewer(reference, activities);
 
   const filters = parseFeedFilters(params);
   const visible = applyFeedFilters(activities, filters, distanceMap);
-  const countWith = (patch: Partial<Filters>) =>
-    applyFeedFilters(activities, { ...filters, ...patch }, distanceMap).length;
-  const counts = {
-    sport: Object.fromEntries(SPORTS.map((s) => [s.value, countWith({ sport: s.value })])),
-    when: Object.fromEntries(WHEN_OPTIONS.map((o) => [o.value, countWith({ when: o.value })])),
-    radius: Object.fromEntries(RADIUS_OPTIONS.map((r) => [r, countWith({ radius: r })])),
-    all: {
-      sport: countWith({ sport: undefined }),
-      when: countWith({ when: undefined }),
-      radius: countWith({ radius: undefined }),
-    },
-  };
-
   const ids = visible.map((a) => a.id);
   const [participantsMap, matchMap, statuses] = await Promise.all([
     getApprovedParticipantsForActivities(ids),
@@ -97,7 +86,12 @@ export default async function Home({ searchParams }: HomeProps) {
         </span>
       </div>
 
-      <FeedFilters filters={filters} counts={counts} hasReference={reference != null} />
+      <FeedFilters
+        filters={filters}
+        items={activities.map(({ id, type, start_date }) => ({ id, type, start_date }))}
+        distances={distanceMap}
+        referenceLabel={referenceLabel}
+      />
 
       {currentUser && Object.keys(matchMap).length > 0 && (
         <p className="text-xs text-gray-500">
