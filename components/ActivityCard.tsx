@@ -158,7 +158,7 @@ export default function ActivityCard({ activity, href, badge, anonymous }: Activ
           {getSportLabel(sport)}
         </span>
         {activity.distanceFromViewerKm != null && (
-          <span className="absolute bottom-2 left-3 flex h-7 items-center gap-1 rounded-full bg-white/95 px-2.5 text-[13px] font-semibold text-gray-900 shadow-sm">
+          <span className="absolute bottom-6 right-3 flex h-7 items-center gap-1 rounded-full bg-white/95 px-2.5 text-[13px] font-semibold text-gray-900 shadow-sm">
             <Navigation className="h-3.5 w-3.5 text-gray-500" aria-hidden="true" />
             à {numberFormat.format(activity.distanceFromViewerKm)} km
           </span>
