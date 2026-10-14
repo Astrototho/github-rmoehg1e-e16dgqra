@@ -1,5 +1,6 @@
 'use client';
 
+import TimeSelect from '@/components/TimeSelect';
 import { useRef, useState } from 'react';
 import { MapPin, Calendar, TrendingUp, AlertCircle } from 'lucide-react';
 import { createActivity, updateActivity } from '@/app/actions';
@@ -136,17 +137,8 @@ export default function PropositionForm({
           />
         </div>
         <div className="min-w-0">
-          <label htmlFor="time" className="mb-2 block text-sm font-medium text-gray-700">
-            Heure
-          </label>
-          <input
-            id="time"
-            type="time"
-            name="time"
-            required
-            defaultValue={initialDateTime?.time}
-            className={inputClass}
-          />
+          <p className="mb-2 block text-sm font-medium text-gray-700">Heure</p>
+          <TimeSelect name="time" defaultValue={initialDateTime?.time} className={inputClass} />
         </div>
       </div>
 
