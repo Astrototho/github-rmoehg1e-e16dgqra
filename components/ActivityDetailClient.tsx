@@ -291,7 +291,7 @@ export default function ActivityDetailClient({
             {/* Largeur mini : sur petit écran, les boutons passent à la ligne
                 plutôt que de tronquer le nom. */}
             <Link
-              href={currentUserId ? `/users/${activity.organizer_id}` : '/login'}
+              href={currentUserId ? `/users/${activity.organizer_id}` : `/login?callbackUrl=/activities/${activity.id}`}
               className="flex min-w-[12rem] flex-1 items-center gap-3"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -341,7 +341,7 @@ export default function ActivityDetailClient({
               {approved.map((p) => (
                 <div key={p.id} className="flex flex-wrap items-center gap-3">
                   <Link
-                    href={currentUserId ? `/users/${p.user_id}` : '/login'}
+                    href={currentUserId ? `/users/${p.user_id}` : `/login?callbackUrl=/activities/${activity.id}`}
                     className="flex min-w-[10rem] flex-1 items-center gap-3"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -451,7 +451,7 @@ export default function ActivityDetailClient({
           <div className="sticky bottom-nav-offset z-30 pb-2">
             {!currentUserId ? (
               <Link
-                href="/login"
+                href={`/login?callbackUrl=/activities/${activity.id}`}
                 className="block w-full rounded-2xl bg-primary py-4 text-center font-bold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary/90"
               >
                 Connecte-toi pour participer

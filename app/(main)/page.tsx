@@ -4,12 +4,20 @@ import { getUpcomingActivities } from '@/lib/activities';
 import { getApprovedParticipantsForActivities } from '@/lib/participations';
 import { getDistancesFromViewer, getMatchPercentages, sortFeed } from '@/lib/feed';
 import { getCurrentUser } from '@/lib/session';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  const currentUser = await getCurrentUser();
-  const upcoming = await getUpcomingActivities();
+  const [currentUser, upcoming, cookieStore] = await Promise.all([
+    getCurrentUser(),
+    getUpcomingActivities(),
+    cookies(),
+  ]);
+  // Premier lancement sans compte : écran d'accueil (« Voir les sorties
+  // d'abord » y pose le cookie pc_apercu pour ne plus y être renvoyé).
+  if (!currentUser && !cookieStore.has('pc_apercu')) redirect('/login');
   // Sur le fil, on ne montre pas les sorties que l'on organise soi-même.
   const activities = currentUser
     ? upcoming.filter((a) => a.organizer_id !== currentUser.id)
