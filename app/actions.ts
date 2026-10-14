@@ -6,6 +6,7 @@
 // Les lectures faites pendant le rendu des pages serveur vivent dans lib/.
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { signOut } from '@/auth';
 import { createAdminClient } from '@/lib/supabase-admin';
@@ -128,6 +129,7 @@ function activityRow(parsed: Extract<ParsedActivityForm, { ok: true }>) {
 export async function createActivity(
   formData: FormData
 ): Promise<ActionResult<{ id: string }>> {
+  let createdId: string;
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) return authError();
@@ -157,19 +159,26 @@ export async function createActivity(
       return fail("Impossible d'enregistrer la sortie.");
     }
 
-    await upsertSavedPlace(currentUser.id, {
+    const userId = currentUser.id;
+    const place = {
       name: parsed.values.location,
       latitude: parsed.values.latitude,
       longitude: parsed.values.longitude,
-    });
+    };
+    runInBackground('enregistrement du lieu de départ', () =>
+      upsertSavedPlace(userId, place)
+    );
 
     revalidateActivity(data.id);
     revalidatePath('/settings');
-    return { success: true, data: { id: data.id } };
+    createdId = data.id;
   } catch (err) {
     console.error('Erreur inattendue createActivity:', err);
     return fail('Une erreur inattendue est survenue.');
   }
+  // Hors du try : redirect() lève une exception interne à Next. La page de la
+  // sortie part dans la même réponse que l'action (un seul aller-retour).
+  redirect(`/activities/${createdId}`);
 }
 
 /** Liste lisible des changements notables, pour la notification envoyée. */
@@ -286,11 +295,11 @@ export async function updateActivity(
 
     revalidateActivity(activityId);
     revalidatePath('/settings');
-    return { success: true, data: { id: activityId } };
   } catch (err) {
     console.error('Erreur inattendue updateActivity:', err);
     return fail('Une erreur inattendue est survenue.');
   }
+  redirect(`/activities/${activityId}`);
 }
 
 export async function cancelActivity(activityId: string): Promise<ActionResult> {
@@ -322,14 +331,16 @@ export async function cancelActivity(activityId: string): Promise<ActionResult> 
 
     // Les demandes en attente n'ont plus à être traitées : on retire les
     // notifications "participation_request" correspondantes de la cloche.
-    const { data: pending } = await admin()
-      .from('participations')
-      .select('id')
-      .eq('activity_id', activityId)
-      .eq('status', 'pending');
+    const [{ data: pending }, participantIds] = await Promise.all([
+      admin()
+        .from('participations')
+        .select('id')
+        .eq('activity_id', activityId)
+        .eq('status', 'pending'),
+      getParticipantIdsToNotify(activityId),
+    ]);
     await markNotificationsByRelatedId((pending ?? []).map((p) => p.id as string));
 
-    const participantIds = await getParticipantIdsToNotify(activityId);
     await createNotifications(
       participantIds.map((userId) => ({
         userId,
@@ -343,7 +354,6 @@ export async function cancelActivity(activityId: string): Promise<ActionResult> 
     );
 
     revalidateActivity(activityId);
-    revalidatePath('/', 'layout');
     return { success: true };
   } catch (err) {
     console.error('Erreur inattendue cancelActivity:', err);
@@ -390,13 +400,15 @@ export async function requestParticipation(activityId: string): Promise<ActionRe
 
     // % de match affiché au moment de la demande : donnée d'entraînement du
     // futur modèle de matching (cf. CLAUDE.md).
-    const matchMap = await getMatchPercentages(currentUser, [activity]);
+    const [matchMap, existing] = await Promise.all([
+      getMatchPercentages(currentUser, [activity]),
+      getUserParticipation(activityId, currentUser.id),
+    ]);
     const matchLog = {
-      match_percentage: matchMap[activity.id] ?? null,
+      match_percentage: matchMap[activity.id]?.percentage ?? null,
       matching_version: MATCHING_VERSION,
     };
 
-    const existing = await getUserParticipation(activityId, currentUser.id);
     if (existing?.status === 'pending') return fail('Ta demande est déjà en attente.');
     if (existing?.status === 'approved') return fail('Tu participes déjà à cette sortie.');
 
@@ -428,7 +440,6 @@ export async function requestParticipation(activityId: string): Promise<ActionRe
     await notifyOrganizerOfRequest(activity, currentUser.name, participationId);
 
     revalidateActivity(activityId);
-    revalidatePath('/', 'layout');
     return { success: true };
   } catch (err) {
     console.error('Erreur requestParticipation:', err);
@@ -485,21 +496,21 @@ export async function updateParticipationStatus(
 
     // La demande d'acceptation a été traitée : on retire la notification
     // "participation_request" de la cloche de l'organisateur.
-    await markNotificationsByRelatedId(participationId);
-
-    await createNotification({
-      userId: participation.user_id,
-      type: status === 'approved' ? 'participation_approved' : 'participation_rejected',
-      title: status === 'approved' ? 'Demande acceptée' : 'Demande refusée',
-      body:
-        status === 'approved'
-          ? `Ta demande pour participer à "${activityInfo.title}" a été acceptée !`
-          : `Ta demande pour participer à "${activityInfo.title}" a été refusée.`,
-      link: `/activities/${participation.activity_id}`,
-    });
+    await Promise.all([
+      markNotificationsByRelatedId(participationId),
+      createNotification({
+        userId: participation.user_id,
+        type: status === 'approved' ? 'participation_approved' : 'participation_rejected',
+        title: status === 'approved' ? 'Demande acceptée' : 'Demande refusée',
+        body:
+          status === 'approved'
+            ? `Ta demande pour participer à "${activityInfo.title}" a été acceptée !`
+            : `Ta demande pour participer à "${activityInfo.title}" a été refusée.`,
+          link: `/activities/${participation.activity_id}`,
+      }),
+    ]);
 
     revalidateActivity(participation.activity_id);
-    revalidatePath('/', 'layout');
     return { success: true };
   } catch (err) {
     console.error('Erreur updateParticipationStatus:', err);

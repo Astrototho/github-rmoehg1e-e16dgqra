@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Send } from 'lucide-react';
 import { getConversation, sendMessage } from '@/app/actions';
 import { MESSAGE_MAX } from '@/lib/constraints';
@@ -15,6 +16,8 @@ interface ChatClientProps {
   contactName: string;
   contactAvatar: string;
   currentUserId: string;
+  initialMessages: Message[];
+  hadUnread: boolean;
 }
 
 export default function ChatClient({
@@ -22,10 +25,13 @@ export default function ChatClient({
   contactName,
   contactAvatar,
   currentUserId,
+  initialMessages,
+  hadUnread,
 }: ChatClientProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const router = useRouter();
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [newMessage, setNewMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +51,6 @@ export default function ChatClient({
   // Chargement initial puis rafraîchissement régulier tant que la page est
   // visible (pas de requêtes inutiles quand le téléphone est en veille).
   useEffect(() => {
-    loadMessages();
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') loadMessages();
     }, POLL_INTERVAL_MS);
@@ -56,6 +61,12 @@ export default function ChatClient({
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [loadMessages]);
+
+  // Messages marqués comme lus au rendu serveur : on met à jour les badges
+  // de la barre de navigation, sans bloquer l'affichage.
+  useEffect(() => {
+    if (hadUnread) router.refresh();
+  }, [hadUnread, router]);
 
   // Défilement en bas uniquement quand un nouveau message arrive.
   useEffect(() => {

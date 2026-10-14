@@ -10,6 +10,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Échelle de la couleur de marque (#F16423 = 500). Pour du texte
+        // orange sur fond blanc, utiliser brand-700 (contraste AA).
+        brand: {
+          50: '#FFF4ED',
+          100: '#FFE6D5',
+          200: '#FECBAA',
+          500: '#F16423',
+          600: '#C94A12',
+          700: '#C2410C',
+          800: '#9A3412',
+        },
         // C'est ici qu'on fait le pont entre le CSS et Tailwind
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',

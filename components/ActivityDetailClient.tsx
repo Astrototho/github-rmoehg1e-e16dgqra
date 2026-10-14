@@ -43,6 +43,7 @@ interface ActivityDetailClientProps {
   isOrganizer: boolean;
   canEdit: boolean;
   matchPercentage: number | null;
+  matchHint?: string;
   myMatchFeedback: boolean | null;
 }
 
@@ -54,6 +55,7 @@ export default function ActivityDetailClient({
   isOrganizer,
   canEdit,
   matchPercentage,
+  matchHint,
   myMatchFeedback,
 }: ActivityDetailClientProps) {
   const router = useRouter();
@@ -110,11 +112,7 @@ export default function ActivityDetailClient({
     const result = await cancelActivity(activity.id);
     setIsCancelling(false);
     setConfirmingCancel(false);
-    if (result.success) {
-      router.refresh();
-    } else {
-      setError(result.error);
-    }
+    if (!result.success) setError(result.error);
   };
 
   return (
@@ -147,8 +145,8 @@ export default function ActivityDetailClient({
         </div>
         {matchPercentage != null && (
           <div className="pointer-events-none absolute right-4 top-4 z-[400] flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-lg">
-            <span className="h-2 w-2 rounded-full bg-green-500" />
-            <span className="font-black text-green-600">{matchPercentage}%</span>
+            <span className="h-2 w-2 rounded-full bg-brand-500" />
+            <span className="font-black text-brand-700">{matchPercentage} %</span>
             <span className="text-xs font-semibold text-gray-500">match</span>
           </div>
         )}
@@ -158,6 +156,11 @@ export default function ActivityDetailClient({
           </h2>
         </div>
       </div>
+      {matchHint && (
+        <p className="mx-4 mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+          {matchHint}
+        </p>
+      )}
 
       <div className="space-y-4 p-4">
         {cancelled && (
@@ -295,7 +298,7 @@ export default function ActivityDetailClient({
             {/* Largeur mini : sur petit écran, les boutons passent à la ligne
                 plutôt que de tronquer le nom. */}
             <Link
-              href={currentUserId ? `/users/${activity.organizer_id}` : '/login'}
+              href={currentUserId ? `/users/${activity.organizer_id}` : `/login?callbackUrl=/activities/${activity.id}`}
               className="flex min-w-[12rem] flex-1 items-center gap-3"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -345,7 +348,7 @@ export default function ActivityDetailClient({
               {approved.map((p) => (
                 <div key={p.id} className="flex flex-wrap items-center gap-3">
                   <Link
-                    href={currentUserId ? `/users/${p.user_id}` : '/login'}
+                    href={currentUserId ? `/users/${p.user_id}` : `/login?callbackUrl=/activities/${activity.id}`}
                     className="flex min-w-[10rem] flex-1 items-center gap-3"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -411,11 +414,6 @@ export default function ActivityDetailClient({
                       {p.user_name}
                     </Link>
                     <div className="flex flex-wrap items-center gap-x-2">
-                      {p.match_percentage != null && (
-                        <span className="text-xs font-bold text-green-600">
-                          {p.match_percentage}% match
-                        </span>
-                      )}
                       <Link
                         href={`/messages/${p.user_id}`}
                         className="text-xs text-primary hover:underline"
@@ -455,7 +453,7 @@ export default function ActivityDetailClient({
           <div className="sticky bottom-nav-offset z-30 pb-2">
             {!currentUserId ? (
               <Link
-                href="/login"
+                href={`/login?callbackUrl=/activities/${activity.id}`}
                 className="block w-full rounded-2xl bg-primary py-4 text-center font-bold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary/90"
               >
                 Connecte-toi pour participer

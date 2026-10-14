@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "WebSearch",
+      "WebFetch",
+      "Workflow",
+      "Agent",
+      "mcp__Supabase",
+      "mcp__Vercel",
+      "mcp__github",
+      "mcp__Consensus",
+      "mcp__FastTrack_Literature_Open",
+      "mcp__PubMed"
+    ]
+  }
+}
