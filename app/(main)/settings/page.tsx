@@ -29,13 +29,13 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col h-full bg-gray-50">
       <div className="px-4 py-6 bg-white border-b border-gray-100">
-        <h1 className="text-2xl font-black text-gray-900">Paramètres</h1>
+        <h1 className="text-2xl font-black text-navy-900">Paramètres</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Connexion Strava */}
         <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
-          <h2 className="font-bold text-gray-900">Connexion Strava</h2>
+          <h2 className="font-bold text-navy-900">Connexion Strava</h2>
           {stravaConnected ? (
             <p className="text-sm text-green-600 font-medium">
               ✓ Connecté — le matching est actif
@@ -54,7 +54,7 @@ export default async function SettingsPage() {
               >
                 <button
                   type="submit"
-                  className="w-full flex items-center justify-center gap-2 bg-primary/10 text-primary font-semibold py-3 rounded-xl hover:bg-primary/20 transition-colors text-sm"
+                  className="w-full flex items-center justify-center gap-2 bg-brand-50 text-brand-700 font-semibold py-3 rounded-xl hover:bg-brand-100 transition-colors text-sm"
                 >
                   <Zap className="w-4 h-4" />
                   Reconnecter Strava
@@ -66,7 +66,7 @@ export default async function SettingsPage() {
 
         {/* Application installable (PWA) */}
         <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
-          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="font-bold text-navy-900 flex items-center gap-2">
             <Smartphone className="w-4 h-4" />
             Application
           </h2>
@@ -75,7 +75,7 @@ export default async function SettingsPage() {
 
         {/* Notifications push */}
         <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
-          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="font-bold text-navy-900 flex items-center gap-2">
             <Bell className="w-4 h-4" />
             Notifications
           </h2>
@@ -84,7 +84,7 @@ export default async function SettingsPage() {
 
         {/* Localisation */}
         <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
-          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="font-bold text-navy-900 flex items-center gap-2">
             <MapPin className="w-4 h-4" />
             Localisation
           </h2>
@@ -93,7 +93,7 @@ export default async function SettingsPage() {
 
         {/* Lieux de départ enregistrés */}
         <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
-          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="font-bold text-navy-900 flex items-center gap-2">
             <Bookmark className="w-4 h-4" />
             Mes lieux de départ
           </h2>
@@ -113,7 +113,7 @@ export default async function SettingsPage() {
 
         {/* Compte */}
         <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
-          <h2 className="font-bold text-gray-900">Compte</h2>
+          <h2 className="font-bold text-navy-900">Compte</h2>
           <form action={signOutAction}>
             <button
               type="submit"

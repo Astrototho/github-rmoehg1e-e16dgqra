@@ -43,7 +43,7 @@ export default async function NotificationsPage() {
   return (
     <div className="flex flex-col h-full bg-white">
       <div className="px-4 py-6 border-b border-gray-100 sticky top-header bg-white/90 backdrop-blur-md z-40">
-        <h1 className="text-2xl font-black text-gray-900">Notifications</h1>
+        <h1 className="text-2xl font-black text-navy-900">Notifications</h1>
         <p className="text-gray-500 text-sm mt-1">Demandes et réponses</p>
       </div>
 

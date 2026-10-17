@@ -94,7 +94,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Pour rejoindre « {activity.title} »
           </p>
         )}
-        <h1 className="welcome-rise text-[28px] font-black leading-[1.15] tracking-tight text-gray-900">
+        <h1 className="welcome-rise text-[28px] font-black leading-[1.15] tracking-tight text-navy-900">
           {title}
         </h1>
         <p className="welcome-rise mt-2 text-base text-gray-600 [animation-delay:80ms]">{subtitle}</p>

@@ -42,7 +42,7 @@ export default function ProfileTabs({
             className={`py-3 border-b-2 flex items-center gap-1.5 transition-colors ${
               tab === 'sorties'
                 ? 'text-primary border-primary'
-                : 'text-gray-600 border-transparent hover:text-gray-900'
+                : 'text-gray-600 border-transparent hover:text-navy-900'
             }`}
           >
             <List className="w-4 h-4" />
@@ -53,7 +53,7 @@ export default function ProfileTabs({
             className={`py-3 border-b-2 flex items-center gap-1.5 transition-colors ${
               tab === 'carte'
                 ? 'text-primary border-primary'
-                : 'text-gray-600 border-transparent hover:text-gray-900'
+                : 'text-gray-600 border-transparent hover:text-navy-900'
             }`}
           >
             <Map className="w-4 h-4" />
@@ -78,7 +78,7 @@ export default function ProfileTabs({
                 className="relative aspect-square overflow-hidden bg-primary/10 flex flex-col items-center justify-center p-2 hover:bg-primary/20 transition-colors"
               >
                 <span className="text-2xl mb-1">{getSportEmoji(activity.type)}</span>
-                <span className="text-[11px] font-semibold text-gray-900 text-center line-clamp-2">
+                <span className="text-[11px] font-semibold text-navy-900 text-center line-clamp-2">
                   {activity.title}
                 </span>
                 <span className="text-[10px] text-gray-500 mt-0.5">

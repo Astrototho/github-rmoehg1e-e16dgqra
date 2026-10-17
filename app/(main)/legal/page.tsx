@@ -15,7 +15,7 @@ export default function LegalPage() {
         >
           <ArrowLeft className="w-5 h-5 text-gray-700" />
         </Link>
-        <h1 className="font-bold text-gray-900">Politique de confidentialité</h1>
+        <h1 className="font-bold text-navy-900">Politique de confidentialité</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm text-gray-700 leading-relaxed">
@@ -27,7 +27,7 @@ export default function LegalPage() {
         </div>
 
         <section className="space-y-1">
-          <h2 className="font-bold text-gray-900">Données collectées</h2>
+          <h2 className="font-bold text-navy-900">Données collectées</h2>
           <p>
             Quand tu te connectes avec Strava, nous recevons ton identifiant
             athlète, ton prénom et nom, ta photo de profil, ta ville et ton
@@ -39,7 +39,7 @@ export default function LegalPage() {
         </section>
 
         <section className="space-y-1">
-          <h2 className="font-bold text-gray-900">Utilisation</h2>
+          <h2 className="font-bold text-navy-900">Utilisation</h2>
           <p>
             Ces informations servent à créer ton profil, afficher les sorties
             que tu organises ou rejoins, calculer un pourcentage de matching
@@ -49,7 +49,7 @@ export default function LegalPage() {
         </section>
 
         <section className="space-y-1">
-          <h2 className="font-bold text-gray-900">
+          <h2 className="font-bold text-navy-900">
             Ce que voient les autres membres
           </h2>
           <p>
@@ -61,7 +61,7 @@ export default function LegalPage() {
         </section>
 
         <section className="space-y-1">
-          <h2 className="font-bold text-gray-900">Stockage</h2>
+          <h2 className="font-bold text-navy-900">Stockage</h2>
           <p>
             Tes données sont stockées dans une base de données Supabase,
             accessible uniquement depuis le serveur de l&apos;application. Les
@@ -72,7 +72,7 @@ export default function LegalPage() {
         </section>
 
         <section className="space-y-1">
-          <h2 className="font-bold text-gray-900">
+          <h2 className="font-bold text-navy-900">
             Suppression de tes données
           </h2>
           <p>

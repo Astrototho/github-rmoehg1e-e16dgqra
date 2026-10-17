@@ -80,7 +80,7 @@ export default function CityPicker({
       {currentCity && (
         <p className="text-sm text-gray-600">
           Ville actuelle :{' '}
-          <span className="font-semibold text-gray-900">
+          <span className="font-semibold text-navy-900">
             {currentCity}
             {currentCountry ? `, ${currentCountry}` : ''}
           </span>

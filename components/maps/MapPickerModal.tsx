@@ -137,7 +137,7 @@ export default function MapPickerModal({
           >
             <X className="h-5 w-5" />
           </button>
-          <p className="flex-1 truncate font-semibold text-gray-900">{title}</p>
+          <p className="flex-1 truncate font-semibold text-navy-900">{title}</p>
         </div>
         <PlaceAutocomplete
           placeholder="Rechercher une adresse, un lieu..."

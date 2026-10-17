@@ -43,9 +43,9 @@ export const authConfig = {
         path.startsWith('/api/auth') ||
         path === '/login' ||
         path.startsWith('/legal') ||
-        // Icônes et manifest de l'app installable (PWA)
-        path.startsWith('/icon') ||
-        path.startsWith('/apple-icon') ||
+        // Manifest de l'app installable (PWA). Les icônes (/favicon.ico,
+        // /icons/*.png, /apple-touch-icon.png) sont des fichiers statiques :
+        // le matcher du middleware exclut tout chemin avec une extension.
         path === '/manifest.webmanifest'
       ) {
         return true;

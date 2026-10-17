@@ -49,7 +49,7 @@ export default async function EditActivityPage({ params }: PageProps) {
       ) : (
         <div className="flex flex-col items-center rounded-2xl border border-gray-100 bg-gray-50 px-6 py-12 text-center">
           <Lock className="mb-3 h-8 w-8 text-gray-400" />
-          <p className="font-semibold text-gray-900">Modification impossible</p>
+          <p className="font-semibold text-navy-900">Modification impossible</p>
           <p className="mt-1 text-sm text-gray-500">
             {activity.status === 'cancelled'
               ? 'Cette sortie a été annulée.'

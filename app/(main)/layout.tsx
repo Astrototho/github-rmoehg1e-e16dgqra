@@ -54,7 +54,7 @@ export default async function MainLayout({
             >
               <Bell className="h-6 w-6 stroke-[1.5]" />
               {unreadNotifications > 0 && (
-                <span className="absolute right-0.5 top-0.5 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full border-2 border-white bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                <span className="absolute right-0.5 top-0.5 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full border-2 border-white bg-red-600 px-1 text-[10px] font-bold leading-none text-white">
                   {unreadNotifications > 9 ? '9+' : unreadNotifications}
                 </span>
               )}

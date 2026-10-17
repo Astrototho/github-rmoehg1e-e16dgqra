@@ -11,7 +11,7 @@ export default function StravaConnectButton() {
       <button
         type="submit"
         disabled={pending}
-        className={`mx-auto block rounded-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gray-900 ${
+        className={`mx-auto block rounded-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-navy-900 ${
           pending ? 'opacity-60' : ''
         }`}
       >

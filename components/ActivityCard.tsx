@@ -64,7 +64,7 @@ function MatchRing({ avatar, percentage }: { avatar: string; percentage?: number
           cy="32"
           r="29"
           fill="white"
-          stroke={known ? '#F3F4F6' : '#D1D5DB'}
+          className={known ? 'stroke-gray-100' : 'stroke-gray-300'}
           strokeWidth="4"
           strokeDasharray={known ? undefined : '3 5'}
         />
@@ -74,7 +74,7 @@ function MatchRing({ avatar, percentage }: { avatar: string; percentage?: number
             cy="32"
             r="29"
             fill="none"
-            stroke="#F16423"
+            className="stroke-brand-500"
             strokeWidth="4"
             strokeLinecap="round"
             strokeDasharray={RING_C}
@@ -100,7 +100,7 @@ function EffortBars({ level }: { level: number }) {
         {[0, 1, 2, 3].map((i) => (
           <span
             key={i}
-            className={`w-[3px] rounded-sm ${i <= level ? 'bg-gray-900' : 'bg-gray-300'}`}
+            className={`w-[3px] rounded-sm ${i <= level ? 'bg-navy-900' : 'bg-gray-300'}`}
             style={{ height: 6 + i * 2 }}
           />
         ))}
@@ -155,12 +155,12 @@ export default function ActivityCard({ activity, href, badge, anonymous }: Activ
             <span className="text-xs text-gray-600">Point de départ à préciser</span>
           </div>
         )}
-        <span className="absolute left-3 top-3 flex h-7 items-center gap-1.5 rounded-full bg-white/95 px-2.5 text-[13px] font-semibold text-gray-900 shadow-sm">
+        <span className="absolute left-3 top-3 flex h-7 items-center gap-1.5 rounded-full bg-white/95 px-2.5 text-[13px] font-semibold text-navy-900 shadow-sm">
           <span aria-hidden="true">{getSportEmoji(sport)}</span>
           {getSportLabel(sport)}
         </span>
         {activity.distanceFromViewerKm != null && (
-          <span className="absolute bottom-6 right-3 flex h-7 items-center gap-1 rounded-full bg-white/95 px-2.5 text-[13px] font-semibold text-gray-900 shadow-sm">
+          <span className="absolute bottom-6 right-3 flex h-7 items-center gap-1 rounded-full bg-white/95 px-2.5 text-[13px] font-semibold text-navy-900 shadow-sm">
             <Navigation className="h-3.5 w-3.5 text-gray-500" aria-hidden="true" />
             à {numberFormat.format(activity.distanceFromViewerKm)} km
           </span>
@@ -172,7 +172,7 @@ export default function ActivityCard({ activity, href, badge, anonymous }: Activ
               {activity.matchPercentage}
               <span className="text-lg font-extrabold">%</span>
             </span>
-            <span className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/90">
+            <span className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
               match
             </span>
           </div>
@@ -196,7 +196,7 @@ export default function ActivityCard({ activity, href, badge, anonymous }: Activ
               <MatchRing avatar={activity.organizer_avatar} percentage={activity.matchPercentage} />
             </div>
             <div className="min-w-0 pt-1.5">
-              <p className="truncate text-sm font-bold text-gray-900">{organizer}</p>
+              <p className="truncate text-sm font-bold text-navy-900">{organizer}</p>
               <p className="truncate text-xs text-gray-600">
                 {anonymous
                   ? 'Connecte-toi pour voir ton match'
@@ -234,7 +234,7 @@ export default function ActivityCard({ activity, href, badge, anonymous }: Activ
           )}
           {start.label}
         </p>
-        <h3 className="mt-0.5 line-clamp-2 break-words text-[17px] font-bold leading-snug text-gray-900">
+        <h3 className="mt-0.5 line-clamp-2 break-words text-[17px] font-bold leading-snug text-navy-900">
           {activity.title}
         </h3>
         <p className="mt-1 flex items-center gap-1 truncate text-sm text-gray-600">
@@ -245,21 +245,21 @@ export default function ActivityCard({ activity, href, badge, anonymous }: Activ
         <dl className="mt-3 grid grid-cols-3 divide-x divide-gray-200/70 rounded-2xl bg-gray-50 py-2.5 text-center">
           <div>
             <dt className="sr-only">Distance</dt>
-            <dd className="text-lg font-extrabold tabular-nums text-gray-900">
+            <dd className="text-lg font-extrabold tabular-nums text-navy-900">
               {numberFormat.format(distance)}
               <span className="text-xs font-semibold text-gray-500"> km</span>
             </dd>
           </div>
           <div>
             <dt className="sr-only">Dénivelé positif</dt>
-            <dd className="text-lg font-extrabold tabular-nums text-gray-900">
+            <dd className="text-lg font-extrabold tabular-nums text-navy-900">
               {numberFormat.format(elevation)}
               <span className="text-xs font-semibold text-gray-500"> m D+</span>
             </dd>
           </div>
           <div>
             <dt className="sr-only">Durée estimée</dt>
-            <dd className="text-lg font-extrabold tabular-nums text-gray-900">
+            <dd className="text-lg font-extrabold tabular-nums text-navy-900">
               <span className="text-xs font-semibold text-gray-500">≈ </span>
               {formatDuration(duration)}
             </dd>

@@ -72,7 +72,7 @@ export default function MessagesList({ conversations }: MessagesListProps) {
                 <div className="flex justify-between items-baseline mb-1">
                   <h3
                     className={`text-base truncate ${
-                      conv.unread ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'
+                      conv.unread ? 'font-bold text-navy-900' : 'font-semibold text-gray-700'
                     }`}
                   >
                     {conv.contactName}
@@ -83,7 +83,7 @@ export default function MessagesList({ conversations }: MessagesListProps) {
                 </div>
                 <p
                   className={`text-sm truncate ${
-                    conv.unread ? 'font-medium text-gray-900' : 'text-gray-500'
+                    conv.unread ? 'font-medium text-navy-900' : 'text-gray-500'
                   }`}
                 >
                   {conv.lastMessage}

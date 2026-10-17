@@ -119,7 +119,7 @@ export default function FeedFilters({ filters, items, distances, referenceLabel 
         onClick={() => setOpen(true)}
         className="flex h-12 w-full items-center gap-3 rounded-full bg-white px-4 text-left shadow-[0_2px_10px_rgba(16,24,40,.08)] ring-1 ring-gray-200"
       >
-        <SlidersHorizontal className="h-5 w-5 flex-shrink-0 text-gray-900" aria-hidden="true" />
+        <SlidersHorizontal className="h-5 w-5 flex-shrink-0 text-navy-900" aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-800">
           {summary(filters)}
         </span>
@@ -140,7 +140,7 @@ export default function FeedFilters({ filters, items, distances, referenceLabel 
           />
           <div className="relative flex max-h-[88dvh] w-full max-w-md flex-col rounded-t-3xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-              <h2 className="text-lg font-black text-gray-900">Filtres</h2>
+              <h2 className="text-lg font-black text-navy-900">Filtres</h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -153,7 +153,7 @@ export default function FeedFilters({ filters, items, distances, referenceLabel 
 
             <div className="space-y-6 overflow-y-auto px-5 py-5">
               <section>
-                <h3 className="mb-2.5 text-sm font-bold text-gray-900">Sport</h3>
+                <h3 className="mb-2.5 text-sm font-bold text-navy-900">Sport</h3>
                 <div className="grid grid-cols-2 gap-2">
                   <Option selected={!draft.sport} onClick={() => setDraft({ ...draft, sport: undefined })} count={count({ sport: undefined })}>
                     Tous
@@ -172,7 +172,7 @@ export default function FeedFilters({ filters, items, distances, referenceLabel 
               </section>
 
               <section>
-                <h3 className="mb-2.5 text-sm font-bold text-gray-900">Date</h3>
+                <h3 className="mb-2.5 text-sm font-bold text-navy-900">Date</h3>
                 <div className="grid grid-cols-2 gap-2">
                   <Option selected={!draft.when} onClick={() => setDraft({ ...draft, when: undefined })} count={count({ when: undefined })}>
                     Toutes les dates
@@ -191,7 +191,7 @@ export default function FeedFilters({ filters, items, distances, referenceLabel 
               </section>
 
               <section>
-                <h3 className="mb-1 text-sm font-bold text-gray-900">Distance max depuis toi</h3>
+                <h3 className="mb-1 text-sm font-bold text-navy-900">Distance max depuis toi</h3>
                 <p className="mb-2.5 text-xs text-gray-600">
                   {referenceLabel
                     ? `Calculée depuis ${referenceLabel}.`
@@ -216,7 +216,7 @@ export default function FeedFilters({ filters, items, distances, referenceLabel 
                   type="button"
                   onClick={useMyPosition}
                   disabled={locating}
-                  className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gray-100 text-sm font-semibold text-gray-900 disabled:opacity-60"
+                  className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gray-100 text-sm font-semibold text-navy-900 disabled:opacity-60"
                 >
                   <LocateFixed className="h-4 w-4 text-brand-700" aria-hidden="true" />
                   {locating ? 'Localisation en cours…' : 'Utiliser ma position actuelle'}

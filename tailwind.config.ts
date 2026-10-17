@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss';
+import { NAVY, ORANGE } from './lib/brand';
 
 const config: Config = {
   content: [
@@ -10,17 +11,13 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Échelle de la couleur de marque (#F16423 = 500). Pour du texte
-        // orange sur fond blanc, utiliser brand-700 (contraste AA).
-        brand: {
-          50: '#FFF4ED',
-          100: '#FFE6D5',
-          200: '#FECBAA',
-          500: '#F16423',
-          600: '#C94A12',
-          700: '#C2410C',
-          800: '#9A3412',
-        },
+        // Couleurs du logo (lib/brand.ts, docs/charte-graphique.md).
+        // brand = orange : brand-500 est l'orange exact du logo (graphismes,
+        // grands chiffres) ; boutons et texte orange en brand-600 ou plus
+        // foncé (contraste AA). navy = marine : navy-900 est le marine exact
+        // du logo (titres, texte principal, surfaces sombres).
+        brand: ORANGE,
+        navy: NAVY,
         // C'est ici qu'on fait le pont entre le CSS et Tailwind
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',

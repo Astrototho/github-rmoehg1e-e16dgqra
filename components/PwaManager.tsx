@@ -68,7 +68,7 @@ export default function PwaManager() {
     <div className="fixed inset-x-0 top-0 z-[70] mx-auto w-full max-w-md px-3 pt-safe">
       <div
         role="status"
-        className="mt-2 flex items-center gap-3 rounded-2xl bg-gray-900 px-4 py-3 text-white shadow-xl"
+        className="mt-2 flex items-center gap-3 rounded-2xl bg-navy-900 px-4 py-3 text-white shadow-xl"
       >
         <p className="flex-1 text-sm">Une nouvelle version de PerfConnect est disponible.</p>
         <button

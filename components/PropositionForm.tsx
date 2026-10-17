@@ -237,7 +237,7 @@ export default function PropositionForm({
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-xl bg-primary py-3.5 font-bold text-white transition-colors hover:bg-primary/90 disabled:opacity-50"
+        className="w-full rounded-xl bg-primary py-3.5 font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
       >
         {isSubmitting
           ? isEdit

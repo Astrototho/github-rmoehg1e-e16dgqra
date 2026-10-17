@@ -40,11 +40,11 @@ export default async function ProfilePage() {
             <ShareInviteButton />
           </div>
 
-          <h2 className="mb-3 break-words text-xl font-bold text-gray-900">{currentUser.name}</h2>
+          <h2 className="mb-3 break-words text-xl font-bold text-navy-900">{currentUser.name}</h2>
 
           <div className="mb-4 flex gap-6 text-center">
             <div>
-              <p className="text-lg font-bold text-gray-900">
+              <p className="text-lg font-bold text-navy-900">
                 {organizedCount + (participationCount ?? 0)}
               </p>
               <p className="text-xs text-gray-500">Sorties</p>
