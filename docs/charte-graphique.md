@@ -18,19 +18,28 @@ contrastes calculés selon WCAG 2.1. En cas de doute, le code fait foi :
 Deux silhouettes stylisées qui se tiennent : **à gauche en marine, à droite en
 orange**. Deux sportifs qui se rejoignent, c'est-à-dire le match.
 
-### Deux versions
+### Trois versions
 
-| | Symbole seul | Logo complet (symbole + « PerfConnect ») |
+| | Symbole seul | Logo complet (symbole + « PerfConnect ») | Logotype horizontal |
+|---|---|---|---|
+| Aperçu | les deux silhouettes | les silhouettes, avec « **Perf** » en marine et « **Connect** » en orange en dessous | le symbole à gauche et le même lettrage « **Perf** » marine + « **Connect** » orange à droite, centré en hauteur |
+| Fichier de travail | `public/brand/logo-mark.png` (699×489, transparent) | `public/brand/logo-wordmark.png` (1097×695, transparent) ; écrans : `logo-wordmark-480.png` | `public/brand/logo-horizontal.png` (1462×220, transparent) ; en-tête de l'app : `public/logo.png` |
+| Original | `public/brand/logo-source.png` (858×678, fond blanc) | `public/brand/logo-wordmark-source.webp` (1254×1254, fond blanc) | aucun : composé par `scripts/brand-assets.py` à partir des deux originaux (voir « Logotype horizontal ») |
+| **Autorisé** | icônes d'app (favicon, écran d'accueil du téléphone, manifest, futures fiches des stores), avatar des comptes PerfConnect sur les réseaux sociaux, icône des notifications push, petites tailles (moins de 120 px de large), filigrane | écran d'accueil et de connexion, page hors connexion, documents (PDF, présentations, e-mails), site vitrine perfconnect.fr, bannières de réseaux sociaux, supports imprimés | barre du haut de l'app (28 px de haut), et tout espace bas et large où le logo complet ne tient pas à 120 px de large : signature d'e-mail, en-tête ou pied de page d'un document, barre de navigation du site vitrine |
+| **Interdit** | lui accoler soi-même le nom « PerfConnect » dans une autre disposition (toute nouvelle composition symbole + nom doit d'abord être validée et ajoutée à cette charte ; seul le logotype horizontal l'est) | **icône d'app** sous toutes ses formes (favicon, `apple-touch-icon`, icônes du manifest, maskable, stores), avatar, **très petites tailles** (moins de 120 px de large à l'écran, moins de 30 mm à l'impression : le nom devient illisible, utiliser le symbole seul), en-tête de l'app (28 px de haut : nom illisible, utiliser le logotype horizontal) | **icône d'app** et avatar (comme le logo complet), moins de 24 px de haut à l'écran, le recomposer soi-même ou changer l'espace ou le rapport de taille entre symbole et nom, le mettre à la place du logo complet là où celui-ci tient (accueil, connexion, page hors connexion) |
+
+Le logo complet et le logotype horizontal ne sont jamais des icônes d'app : un
+nom en petits caractères est illisible sur un écran d'accueil et les
+plateformes affichent déjà le nom de l'app sous l'icône.
+
+### Où chaque version est utilisée dans l'app
+
+| Écran | Version | Taille affichée |
 |---|---|---|
-| Aperçu | les deux silhouettes | les silhouettes, avec « **Perf** » en marine et « **Connect** » en orange en dessous |
-| Fichier de travail | `public/brand/logo-mark.png` (699×489, transparent) | `public/brand/logo-wordmark.png` (1097×695, transparent) |
-| Original | `public/brand/logo-source.png` (858×678, fond blanc) | `public/brand/logo-wordmark-source.webp` (1254×1254, fond blanc) |
-| **Autorisé** | icônes d'app (favicon, écran d'accueil du téléphone, manifest, futures fiches des stores), avatar des comptes PerfConnect sur les réseaux sociaux, icône des notifications push, petites tailles (moins de 120 px de large), filigrane | écran d'accueil et de connexion, page hors connexion, documents (PDF, présentations, e-mails), site vitrine perfconnect.fr, bannières de réseaux sociaux, supports imprimés |
-| **Interdit** | lui accoler soi-même le nom « PerfConnect » dans une autre disposition (toute nouvelle composition symbole + nom doit d'abord être validée et ajoutée à cette charte) | **icône d'app** sous toutes ses formes (favicon, `apple-touch-icon`, icônes du manifest, maskable, stores), avatar, **très petites tailles** (moins de 120 px de large à l'écran, moins de 30 mm à l'impression : le nom devient illisible, utiliser le symbole seul), en-tête de l'app (28 px de haut : nom illisible, voir « Logotype de l'en-tête ») |
-
-Le logo complet n'est jamais une icône d'app : un nom en petits caractères est
-illisible sur un écran d'accueil et les plateformes affichent déjà le nom de
-l'app sous l'icône.
+| Barre du haut des pages principales ([`app/(main)/layout.tsx`](../app/(main)/layout.tsx)) | logotype horizontal, `public/logo.png` | 28 px de haut (`h-7`), 186 px de large ; réduit sans déformation jusqu'à 160×24 px sur les téléphones de 320 px de large |
+| Accueil et connexion ([`app/(immersive)/login/page.tsx`](../app/(immersive)/login/page.tsx)) | logo complet, `public/brand/logo-wordmark-480.png`, centré au-dessus de l'illustration | 136 px de large ; 120 px quand l'écran fait moins de 600 px de haut (iPhone SE dans Safari), pour que le bouton Strava reste visible sans défiler |
+| Page hors connexion ([`public/offline.html`](../public/offline.html)) | logo complet, `public/brand/logo-wordmark-480.png` (précaché par le service worker) | 160 px de large |
+| Favicon, icônes d'installation, notifications push | symbole seul | voir le tableau des icônes ci-dessous |
 
 ### Fichiers
 
@@ -40,7 +49,9 @@ l'app sous l'icône.
 | `public/brand/logo-mark.png` | Symbole détouré, recadré au plus juste. Couleurs exactes uniquement (`#022354`, `#FE5820`). |
 | `public/brand/logo-wordmark-source.webp` | Original du logo complet (fond blanc). Ne pas retoucher. |
 | `public/brand/logo-wordmark.png` | Logo complet détouré, recadré au plus juste, couleurs exactes (99 % des pixels pleins en `#022354` ou `#FE5820`). |
-| `public/logo.png` | Logotype de l'en-tête et de la page hors connexion (ancien motif à points + « PerfConnect »), recoloré en `#FE5820`. Provisoire : à remplacer par une version **horizontale** du logo complet (symbole à gauche, « Perf » marine + « Connect » orange à droite), à dessiner et valider. |
+| `public/brand/logo-wordmark-480.png` | Logo complet réduit pour les écrans (480×303, 17 Ko) : connexion et page hors connexion, affiché entre 120 et 160 px de large. |
+| `public/brand/logo-horizontal.png` | Logotype horizontal haute définition (1462×220, transparent), à la résolution d'origine du lettrage : documents, e-mails, site vitrine. |
+| `public/logo.png` | Logotype horizontal de l'en-tête de l'app (745×112 : 28 px de haut, net jusqu'en 4×, 15 Ko). |
 | `app/favicon.ico` | Favicon 16, 32 et 48 px (symbole seul) |
 | `public/apple-touch-icon.png` | Icône iOS / Safari, 180×180, opaque (symbole seul) |
 | `public/icons/icon-192.png`, `icon-512.png` | Icônes du manifest, `purpose: any` (symbole seul) |
@@ -64,8 +75,13 @@ python3 scripts/brand-assets.py
 ```
 
 Remplacer d'abord l'original concerné dans `public/brand/`, puis incrémenter
-`CACHE_VERSION` dans `public/sw.js` (le logo de l'en-tête et l'icône 192 sont
+`CACHE_VERSION` dans `public/sw.js` (le logo complet réduit et l'icône 192 sont
 précachés pour la page hors connexion).
+
+Les logos réduits (`logo-wordmark-480.png`, `logo-horizontal.png`,
+`public/logo.png`) sont des PNG à palette : chaque pixel est du marine ou de
+l'orange exact, avec 128 niveaux de transparence. Aucune autre couleur, et des
+fichiers 2 à 3 fois plus légers qu'en RGBA.
 
 ### Couleurs et proportions du logo complet
 
@@ -80,12 +96,38 @@ précachés pour la page hors connexion).
 - Espace entre le bas du symbole et le haut du nom : environ ½ x (x défini
   ci-dessous) ; hauteur du nom : environ 1 x.
 
+### Logotype horizontal
+
+Version pour les espaces bas et larges, en premier lieu la barre du haut de
+l'app (28 px de haut), où le nom du logo complet serait illisible. Choisie par
+le fondateur le 17 octobre 2026 entre deux propositions (l'autre : nom à 50 %
+de la hauteur du symbole, espace ½ x).
+
+Construction, uniquement à partir des fichiers officiels (jamais avec une
+police) :
+
+- à gauche, le symbole (`logo-source.png`) ;
+- à droite, le lettrage « PerfConnect » **découpé** dans le logo complet
+  (`logo-wordmark-source.webp`), sans le retoucher ;
+- hauteur du lettrage (jambage du « f » compris) : **64 % de la hauteur du
+  symbole** ;
+- espace entre le symbole et le lettrage : **1 x** ;
+- lettrage centré verticalement sur le symbole ;
+- proportions : 6,65 pour 1 (745×112). À 28 px de haut : 186 px de large, nom
+  d'environ 18 px de haut.
+
+Les valeurs sont les constantes `LOCKUP_NAME_RATIO` et `LOCKUP_GAP_X` de
+`scripts/brand-assets.py` : pour changer le logotype, modifier ces constantes
+et relancer le script, jamais retoucher l'image à la main.
+
 ### Zone de protection
 
 Unité **x = diamètre d'une tête** des silhouettes (≈ 19 % de la largeur du
 symbole, ≈ 27 % de sa hauteur). Laisser **au moins x d'espace vide** tout autour
-du symbole ou du logo complet : pas de texte, de bord d'écran ni d'autre logo
-dans cette zone.
+de chaque version : pas de texte, de bord d'écran ni d'autre logo dans cette
+zone. Dans la barre du haut, x vaut 7 px ; le logotype a 14 px au-dessus et
+au-dessous, 16 px à gauche et au moins 8 px à droite (marge intérieure du
+bouton Notifications).
 
 Exception : dans les icônes d'app et le favicon, les marges suivent les gabarits
 des plateformes (tableau ci-dessus).
@@ -99,16 +141,18 @@ des plateformes (tableau ci-dessus).
 | Symbole seul, impression | 12 mm de large |
 | Logo complet, écran | 120 px de large (nom ≈ 15 px de haut) ; en dessous, symbole seul |
 | Logo complet, impression | 30 mm de large |
-| Logotype de l'en-tête (provisoire) | 28 px de haut (`h-7`) |
+| Logotype horizontal, écran | 24 px de haut (160 px de large, nom ≈ 15 px de haut, comme le logo complet à 120 px) ; en dessous, symbole seul |
+| Logotype horizontal, impression | 6 mm de haut (40 mm de large) |
 
 ### Fonds autorisés
 
 Blanc, ou fond très clair (`gray-50`, `navy-50`, `brand-50`). Sur un fond
-sombre, coloré ou une photo, le symbole ou le logo complet est **toujours posé
-sur une pastille ou un cartouche blanc** : le marine disparaît sur fond sombre
-(contraste 1,05:1 avec le gris `#202124` des onglets sombres de Chrome).
+sombre, coloré ou une photo, le symbole, le logo complet ou le logotype
+horizontal est **toujours posé sur une pastille ou un cartouche blanc** : le
+marine disparaît sur fond sombre (contraste 1,05:1 avec le gris `#202124` des
+onglets sombres de Chrome).
 
-### Usages interdits (les deux versions)
+### Usages interdits (toutes les versions)
 
 - Changer, éclaircir ou inverser les couleurs des silhouettes ou du nom (le
   marine reste à gauche et sur « Perf », l'orange à droite et sur « Connect »).
@@ -123,7 +167,8 @@ sur une pastille ou un cartouche blanc** : le marine disparaît sur fond sombre
 - Poser le logo sans pastille blanche sur un fond sombre, orange, marine ou
   sur une photo.
 - Utiliser un original à fond blanc (bruité) là où un fond transparent est
-  nécessaire : prendre `logo-mark.png` ou `logo-wordmark.png`.
+  nécessaire : prendre `logo-mark.png`, `logo-wordmark.png` ou
+  `logo-horizontal.png`.
 - Associer le logo à celui de Strava (voir § 5) ou l'utiliser dans un bouton
   Strava.
 
