@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_COLORS, ORANGE } from '@/lib/brand';
+
 // Filet de sécurité si le layout racine lui-même plante.
 export default function GlobalError({ reset }: { reset: () => void }) {
   return (
@@ -13,6 +15,7 @@ export default function GlobalError({ reset }: { reset: () => void }) {
           justifyContent: 'center',
           textAlign: 'center',
           padding: 24,
+          color: BRAND_COLORS.navy,
         }}
       >
         <div>
@@ -28,7 +31,7 @@ export default function GlobalError({ reset }: { reset: () => void }) {
               padding: '12px 20px',
               borderRadius: 12,
               border: 0,
-              background: '#F16423',
+              background: ORANGE[600],
               color: '#fff',
               fontWeight: 700,
             }}

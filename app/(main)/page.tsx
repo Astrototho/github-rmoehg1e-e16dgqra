@@ -80,7 +80,7 @@ export default async function Home({ searchParams }: HomeProps) {
       {currentUser && <InstallAppPrompt variant="banner" />}
 
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-black tracking-tight text-gray-900">Sorties à venir</h1>
+        <h1 className="text-xl font-black tracking-tight text-navy-900">Sorties à venir</h1>
         <span className="whitespace-nowrap rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-600">
           {sorted.length} sortie{sorted.length > 1 ? 's' : ''}
         </span>
@@ -148,11 +148,11 @@ export default async function Home({ searchParams }: HomeProps) {
 
       {!currentUser && (
         <div className="bottom-nav-offset fixed inset-x-0 z-40 mx-auto max-w-md px-4">
-          <div className="flex items-center justify-between gap-3 rounded-2xl bg-gray-900 p-4 text-white shadow-xl">
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-navy-900 p-4 text-white shadow-xl">
             <p className="text-sm font-semibold">Vois ton % de match avec chaque orga</p>
             <Link
               href="/login"
-              className="flex-shrink-0 rounded-xl bg-white px-3.5 py-2 text-sm font-bold text-gray-900"
+              className="flex-shrink-0 rounded-xl bg-white px-3.5 py-2 text-sm font-bold text-navy-900"
             >
               Se connecter
             </Link>

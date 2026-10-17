@@ -44,7 +44,7 @@ export default function MatchFeedbackPrompt({
 
   return (
     <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-      <p className="text-sm font-medium text-gray-900">
+      <p className="text-sm font-medium text-navy-900">
         Le % de matching affiché avec {ratedName} correspondait-il à la réalité ?
       </p>
       <div className="flex gap-2">

@@ -43,7 +43,7 @@ export default function ShareInviteButton() {
       </button>
 
       {showCopiedToast && (
-        <div className="absolute top-full right-0 mt-2 bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-50">
+        <div className="absolute top-full right-0 mt-2 bg-navy-900 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-50">
           Lien copié !
         </div>
       )}

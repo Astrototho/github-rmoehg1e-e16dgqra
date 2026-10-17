@@ -7,10 +7,10 @@
  *
  * Changer CACHE_VERSION invalide le cache statique au prochain chargement.
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE = `perfconnect-static-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
-const PRECACHE_URLS = [OFFLINE_URL, '/logo.png', '/icon/192'];
+const PRECACHE_URLS = [OFFLINE_URL, '/logo.png', '/icons/icon-192.png'];
 const MAX_STATIC_ENTRIES = 150;
 
 self.addEventListener('install', (event) => {
@@ -65,6 +65,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Logo et icône de la page hors connexion : réseau d'abord, cache ensuite.
+  if (PRECACHE_URLS.includes(url.pathname)) {
+    event.respondWith(fetch(request).catch(() => caches.match(request)));
+    return;
+  }
+
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(cacheFirst(request));
   }
@@ -86,7 +92,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: payload.body || '',
-      icon: '/icon/192',
+      icon: '/icons/icon-192.png',
       tag: payload.tag,
       renotify: Boolean(payload.tag),
       data: { url: payload.url || '/notifications' },

@@ -126,7 +126,7 @@ export default function ActivityDetailClient({
         >
           <ArrowLeft className="h-5 w-5 text-gray-700" />
         </button>
-        <h1 className="flex-1 truncate font-bold text-gray-900">Détail de la sortie</h1>
+        <h1 className="flex-1 truncate font-bold text-navy-900">Détail de la sortie</h1>
       </div>
 
       {/* Carte du point de départ + titre */}
@@ -141,7 +141,7 @@ export default function ActivityDetailClient({
         <div className="pointer-events-none absolute inset-0 z-[400] bg-gradient-to-t from-black/50 via-transparent to-transparent" />
         <div className="pointer-events-none absolute left-4 top-4 z-[400] flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 backdrop-blur-sm">
           <span aria-hidden="true">{getSportEmoji(activity.type)}</span>
-          <span className="text-sm font-medium text-gray-900">{getSportLabel(activity.type)}</span>
+          <span className="text-sm font-medium text-navy-900">{getSportLabel(activity.type)}</span>
         </div>
         {matchPercentage != null && (
           <div className="pointer-events-none absolute right-4 top-4 z-[400] flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-lg">
@@ -259,7 +259,7 @@ export default function ActivityDetailClient({
                 <div className="grid grid-cols-2 gap-2">
                   <Link
                     href={`/activities/${activity.id}/edit`}
-                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-primary/10 text-sm font-semibold text-primary hover:bg-primary/20"
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-brand-50 text-sm font-semibold text-brand-700 hover:bg-brand-100"
                   >
                     <Pencil className="h-4 w-4" />
                     Modifier
@@ -284,7 +284,7 @@ export default function ActivityDetailClient({
 
         {activity.description && (
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <h3 className="mb-2 font-bold text-gray-900">Description</h3>
+            <h3 className="mb-2 font-bold text-navy-900">Description</h3>
             <p className="whitespace-pre-line break-words text-sm leading-relaxed text-gray-600">
               {activity.description}
             </p>
@@ -293,7 +293,7 @@ export default function ActivityDetailClient({
 
         {/* Organisateur */}
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <h3 className="mb-3 font-bold text-gray-900">Organisateur</h3>
+          <h3 className="mb-3 font-bold text-navy-900">Organisateur</h3>
           <div className="flex flex-wrap items-center gap-3">
             {/* Largeur mini : sur petit écran, les boutons passent à la ligne
                 plutôt que de tronquer le nom. */}
@@ -308,14 +308,14 @@ export default function ActivityDetailClient({
                 className="h-12 w-12 flex-shrink-0 rounded-full border-2 border-gray-100 object-cover"
               />
               <div className="min-w-0">
-                <p className="truncate font-semibold text-gray-900">{activity.organizer_name}</p>
+                <p className="truncate font-semibold text-navy-900">{activity.organizer_name}</p>
                 <p className="text-xs text-primary">Voir le profil</p>
               </div>
             </Link>
             {!isOrganizer && currentUserId && (
               <Link
                 href={`/messages/${activity.organizer_id}`}
-                className="flex min-h-[44px] items-center gap-2 rounded-xl bg-primary/10 px-4 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
+                className="flex min-h-[44px] items-center gap-2 rounded-xl bg-brand-50 px-4 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100"
               >
                 <MessageCircle className="h-4 w-4" />
                 Contacter
@@ -335,7 +335,7 @@ export default function ActivityDetailClient({
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-2">
             <Users className="h-5 w-5 text-gray-400" />
-            <h3 className="font-bold text-gray-900">
+            <h3 className="font-bold text-navy-900">
               Participants confirmés ({approved.length})
             </h3>
           </div>
@@ -357,7 +357,7 @@ export default function ActivityDetailClient({
                       alt=""
                       className="h-10 w-10 flex-shrink-0 rounded-full border border-gray-100 object-cover"
                     />
-                    <p className="truncate text-sm font-medium text-gray-900">{p.user_name}</p>
+                    <p className="truncate text-sm font-medium text-navy-900">{p.user_name}</p>
                   </Link>
                   {currentUserId && p.user_id !== currentUserId && (
                     <>
@@ -395,7 +395,7 @@ export default function ActivityDetailClient({
           <div className="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <Clock className="h-5 w-5 text-amber-500" />
-              <h3 className="font-bold text-gray-900">Demandes en attente ({pending.length})</h3>
+              <h3 className="font-bold text-navy-900">Demandes en attente ({pending.length})</h3>
             </div>
             <div className="space-y-3">
               {pending.map((p) => (
@@ -409,7 +409,7 @@ export default function ActivityDetailClient({
                   <div className="min-w-0 flex-1">
                     <Link
                       href={`/users/${p.user_id}`}
-                      className="block truncate text-sm font-medium text-gray-900"
+                      className="block truncate text-sm font-medium text-navy-900"
                     >
                       {p.user_name}
                     </Link>
@@ -454,7 +454,7 @@ export default function ActivityDetailClient({
             {!currentUserId ? (
               <Link
                 href={`/login?callbackUrl=/activities/${activity.id}`}
-                className="block w-full rounded-2xl bg-primary py-4 text-center font-bold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary/90"
+                className="block w-full rounded-2xl bg-primary py-4 text-center font-bold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-brand-700"
               >
                 Connecte-toi pour participer
               </Link>
@@ -476,7 +476,7 @@ export default function ActivityDetailClient({
                 type="button"
                 onClick={handleRequest}
                 disabled={isRequesting}
-                className="w-full rounded-2xl bg-primary py-4 font-bold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary/90 disabled:opacity-50"
+                className="w-full rounded-2xl bg-primary py-4 font-bold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-brand-700 disabled:opacity-50"
               >
                 {isRequesting
                   ? 'Envoi...'

@@ -115,7 +115,7 @@ export default function ChatClient({
             alt=""
             className="h-10 w-10 flex-shrink-0 rounded-full border border-gray-100 object-cover"
           />
-          <h1 className="truncate font-bold text-gray-900">{contactName}</h1>
+          <h1 className="truncate font-bold text-navy-900">{contactName}</h1>
         </Link>
       </header>
 
@@ -137,7 +137,7 @@ export default function ChatClient({
                   className={`max-w-[80%] whitespace-pre-line break-words rounded-2xl px-4 py-2.5 text-sm ${
                     isMe
                       ? 'rounded-br-sm bg-primary text-white'
-                      : 'rounded-bl-sm border border-gray-200 bg-white text-gray-900 shadow-sm'
+                      : 'rounded-bl-sm border border-gray-200 bg-white text-navy-900 shadow-sm'
                   }`}
                 >
                   {msg.content}
@@ -166,7 +166,7 @@ export default function ChatClient({
             type="submit"
             disabled={!newMessage.trim() || isSending}
             aria-label="Envoyer"
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:hover:bg-primary"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-brand-700 disabled:opacity-50 disabled:hover:bg-primary"
           >
             <Send className="h-5 w-5" />
           </button>

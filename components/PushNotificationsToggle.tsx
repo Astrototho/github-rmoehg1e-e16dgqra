@@ -144,7 +144,7 @@ export default function PushNotificationsToggle({ compact = false }: PushNotific
             type="button"
             onClick={enable}
             disabled={busy}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary/10 py-3 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-50 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-100 disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
             Activer les notifications sur cet appareil

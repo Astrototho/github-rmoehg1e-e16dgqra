@@ -25,7 +25,7 @@ export default function MyActivitiesTabs({ tabs }: { tabs: Record<TabType, MyAct
   return (
     <div className="flex h-full flex-col bg-gray-50">
       <div className="border-b bg-white px-4 py-6">
-        <h1 className="text-2xl font-black text-gray-900">Mes Sorties</h1>
+        <h1 className="text-2xl font-black text-navy-900">Mes Sorties</h1>
         <p className="mt-1 text-sm text-gray-500">Gère ton planning sportif</p>
       </div>
 
@@ -66,7 +66,7 @@ export default function MyActivitiesTabs({ tabs }: { tabs: Record<TabType, MyAct
         ) : (
           <div className="py-12 text-center">
             <div className="mb-3 text-4xl">📭</div>
-            <h3 className="mb-1 text-lg font-bold text-gray-900">Aucune sortie ici</h3>
+            <h3 className="mb-1 text-lg font-bold text-navy-900">Aucune sortie ici</h3>
             <p className="text-sm text-gray-500">
               Il n&apos;y a rien à afficher dans cette catégorie pour le moment.
             </p>

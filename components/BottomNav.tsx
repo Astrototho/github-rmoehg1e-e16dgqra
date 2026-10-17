@@ -47,7 +47,7 @@ export default function BottomNav({ unreadMessages }: BottomNavProps) {
       >
         <Icon className="h-6 w-6 stroke-[1.5]" />
         {badge != null && badge > 0 && (
-          <span className="absolute -top-1 left-1/2 ml-1 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full border-2 border-white bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+          <span className="absolute -top-1 left-1/2 ml-1 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full border-2 border-white bg-red-600 px-1 text-[10px] font-bold leading-none text-white">
             {badge > 9 ? '9+' : badge}
           </span>
         )}

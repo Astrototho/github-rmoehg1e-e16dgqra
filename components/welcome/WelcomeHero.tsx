@@ -1,5 +1,8 @@
+import { BRAND_COLORS, NAVY, ORANGE } from '@/lib/brand';
+
 // Illustration de l'écran d'accueil : courbes de niveau, tracé d'une sortie
 // et membres fictifs avec leur % de match (SVG inline, aucune requête réseau).
+// Comme dans le logo : toi en orange, les autres sportifs en marine.
 
 const CONTOURS = [
   'M-20 250 C 60 200, 120 230, 190 190 S 330 150, 400 175',
@@ -27,7 +30,7 @@ export default function WelcomeHero() {
       role="img"
       aria-label="Des sportifs reliés par le tracé d'une sortie, avec leur pourcentage de match"
     >
-      <g fill="none" stroke="#F16423" strokeOpacity=".14" strokeWidth="1.5">
+      <g fill="none" stroke={BRAND_COLORS.navy} strokeOpacity=".1" strokeWidth="1.5">
         {CONTOURS.map((d) => (
           <path key={d} d={d} />
         ))}
@@ -35,7 +38,7 @@ export default function WelcomeHero() {
       <path
         d="M62 214 C 100 190, 130 170, 168 150 S 230 112, 262 104 S 320 150, 330 196"
         fill="none"
-        stroke="#F16423"
+        stroke={BRAND_COLORS.orange}
         strokeWidth="3"
         strokeLinecap="round"
         strokeDasharray="6 7"
@@ -47,7 +50,7 @@ export default function WelcomeHero() {
             cx={pin.x}
             cy={pin.y}
             r="20"
-            fill={pin.me ? '#F16423' : '#FFE6D5'}
+            fill={pin.me ? BRAND_COLORS.orange : NAVY[100]}
             stroke="#fff"
             strokeWidth="3"
           />
@@ -57,7 +60,7 @@ export default function WelcomeHero() {
             textAnchor="middle"
             fontSize={pin.me ? 12 : 13}
             fontWeight="800"
-            fill={pin.me ? '#fff' : '#9A3412'}
+            fill={pin.me ? '#fff' : BRAND_COLORS.navy}
           >
             {pin.label}
           </text>
@@ -70,7 +73,7 @@ export default function WelcomeHero() {
                 height="24"
                 rx="12"
                 fill="#fff"
-                stroke="#FFE6D5"
+                stroke={ORANGE[200]}
               />
               <text
                 x={pin.x + 38}
@@ -78,7 +81,7 @@ export default function WelcomeHero() {
                 textAnchor="middle"
                 fontSize="12"
                 fontWeight="800"
-                fill="#C2410C"
+                fill={ORANGE[700]}
               >
                 {pin.match}
               </text>

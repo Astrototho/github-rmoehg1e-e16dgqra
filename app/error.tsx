@@ -18,7 +18,7 @@ export default function ErrorPage({
   return (
     <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
       <AlertTriangle className="mb-4 h-10 w-10 text-amber-500" />
-      <h1 className="mb-2 text-xl font-bold text-gray-900">
+      <h1 className="mb-2 text-xl font-bold text-navy-900">
         Oups, quelque chose s&apos;est mal passé
       </h1>
       <p className="mb-6 max-w-xs text-sm text-gray-500">

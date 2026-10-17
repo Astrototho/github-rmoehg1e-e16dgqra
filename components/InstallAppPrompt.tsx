@@ -66,7 +66,7 @@ export default function InstallAppPrompt({ variant }: InstallAppPromptProps) {
       <div className="relative flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 pr-11">
         <Download className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />
         <div className="min-w-0 flex-1 space-y-2">
-          <p className="text-sm font-semibold text-gray-900">
+          <p className="text-sm font-semibold text-navy-900">
             Installe PerfConnect sur ton téléphone
           </p>
           {platform === 'prompt' ? (
@@ -107,7 +107,7 @@ export default function InstallAppPrompt({ variant }: InstallAppPromptProps) {
       <button
         type="button"
         onClick={() => promptInstall()}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary/10 py-3 text-sm font-semibold text-primary hover:bg-primary/20"
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-50 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-100"
       >
         <Download className="h-4 w-4" />
         Installer l&apos;app sur l&apos;écran d&apos;accueil
