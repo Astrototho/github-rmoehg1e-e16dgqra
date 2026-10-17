@@ -7,10 +7,10 @@
  *
  * Changer CACHE_VERSION invalide le cache statique au prochain chargement.
  */
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `perfconnect-static-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
-const PRECACHE_URLS = [OFFLINE_URL, '/logo.png', '/icons/icon-192.png'];
+const PRECACHE_URLS = [OFFLINE_URL, '/brand/logo-wordmark-480.png', '/icons/icon-192.png'];
 const MAX_STATIC_ENTRIES = 150;
 
 self.addEventListener('install', (event) => {

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Génère les icônes de l'app et les logos détourés à partir des logos officiels.
+"""Génère les icônes de l'app et les logos à partir des logos officiels.
 
 Sources (fond blanc) :
 - public/brand/logo-source.png : symbole seul (~858×678), utilisé pour toutes
   les icônes d'app ;
 - public/brand/logo-wordmark-source.webp : symbole + « PerfConnect »
-  (1254×1254), détouré seulement, jamais utilisé comme icône.
+  (1254×1254), détouré et réduit pour les écrans, jamais utilisé comme icône ;
+  son lettrage « PerfConnect » sert aussi au logotype horizontal de l'en-tête.
 Les fichiers produits sont commités : ce script ne tourne pas au build, il
 suffit de le relancer si le logo change (puis d'incrémenter CACHE_VERSION
 dans public/sw.js).
@@ -20,7 +21,8 @@ dans public/sw.js).
 2. Centrage : sur la boîte englobante des pixels non blancs (alpha > 0,1),
    pas sur la toile d'origine. Redimensionnement Lanczos avec position au
    sous-pixel près.
-3. Rendu de chaque format (voir ICONS).
+3. Rendu de chaque format (voir ICONS), du logo complet pour les écrans et du
+   logotype horizontal (symbole + lettrage officiel, aucune police).
 """
 
 from pathlib import Path
@@ -41,6 +43,18 @@ ALPHA_NOISE = 0.06  # en dessous : bruit du fond blanc (pixels 245–255)
 ALPHA_SOLID = 0.97
 BBOX_ALPHA = 0.1  # « pixel non blanc » pour la boîte englobante
 SUPERSAMPLE = 8  # anticrénelage des coins arrondis
+
+# Logo complet pour les écrans (connexion, hors connexion) : affiché entre 120
+# et 160 px de large, donc 480 px suffisent jusqu'en 3×.
+WORDMARK_SCREEN_WIDTH = 480
+
+# Logotype horizontal : symbole à gauche, lettrage « PerfConnect » découpé dans
+# le logo complet à droite, centré verticalement sur le symbole.
+HEAD_RATIO = 0.264  # x = diamètre d'une tête / hauteur du symbole (127 px sur 481)
+LOCKUP_NAME_RATIO = 0.64  # hauteur du lettrage / hauteur du symbole
+LOCKUP_GAP_X = 1.0  # espace symbole–lettrage, en x
+HEADER_LOGO_HEIGHT = 112  # public/logo.png : affiché à 28 px (h-7), net en 4×
+PALETTE_ALPHA_LEVELS = 128  # par couleur : 2 × 128 = 256 entrées de palette
 
 
 def unmix(rgb: np.ndarray) -> np.ndarray:
@@ -123,6 +137,65 @@ def max_radius(alpha: np.ndarray, box) -> float:
     return float(np.hypot(xs + 0.5 - (x0 + x1) / 2, ys + 0.5 - (y0 + y1) / 2).max())
 
 
+def resample(matte: np.ndarray, box, k: float, x: float, y: float, size) -> np.ndarray:
+    """Boîte `box` de `matte` (prémultiplié) à l'échelle k, coin haut gauche en
+    (x, y) au sous-pixel près, sur une toile transparente size = (w, h)."""
+    w, h = size
+    x0, y0 = box[0], box[1]
+    src = [x0 - x / k, y0 - y / k, x0 + (w - x) / k, y0 + (h - y) / k]
+    # Marge transparente : la zone lue peut dépasser la toile source.
+    sh, sw = matte.shape[:2]
+    pad = int(np.ceil(max(0, -src[0], -src[1], src[2] - sw, src[3] - sh))) + 1
+    padded = np.pad(matte, ((pad, pad), (pad, pad), (0, 0)))
+    src = tuple(v + pad for v in src)
+    channels = []
+    for i in range(4):
+        band = Image.fromarray(padded[..., i].astype(np.float32), mode='F')
+        channels.append(np.asarray(band.resize((w, h), Image.Resampling.LANCZOS, box=src)))
+    return np.dstack(channels).astype(float)
+
+
+def to_palette(premult: np.ndarray) -> Image.Image:
+    """Prémultiplié -> PNG à palette : chaque pixel est du marine ou de l'orange
+    exact, avec 128 niveaux de transparence (256 entrées). Pas de bruit coloré
+    du rééchantillonnage et un fichier 5 à 10 fois plus léger qu'en RGBA."""
+    alpha = np.clip(premult[..., 3], 0, 1)
+    n, o = np.array(NAVY, float), np.array(ORANGE, float)
+    color = premult[..., :3] / np.maximum(alpha, 1e-9)[..., None]
+    orange = ((color - n) @ (o - n)) / ((o - n) @ (o - n)) >= 0.5
+    levels = PALETTE_ALPHA_LEVELS
+    index = orange * levels + np.round(alpha * (levels - 1)).astype(int)
+    image = Image.fromarray(index.astype(np.uint8), 'P')
+    image.putpalette(list(NAVY) * levels + list(ORANGE) * levels)
+    image.info['transparency'] = bytes(round(i * 255 / (levels - 1)) for i in range(levels)) * 2
+    return image
+
+
+def split_wordmark(matte: np.ndarray):
+    """Logo complet -> (boîte du symbole, lettrage seul, boîte du lettrage),
+    coupé au milieu de la bande vide entre les deux."""
+    ys = np.nonzero((matte[..., 3] > 0).any(1))[0]
+    i = np.diff(ys).argmax()
+    cut = (ys[i] + ys[i + 1]) // 2
+    symbol, lettering = matte.copy(), matte.copy()
+    symbol[cut:] = 0
+    lettering[:cut] = 0
+    return bbox(symbol[..., 3]), lettering, bbox(lettering[..., 3])
+
+
+def render_lockup(mark, mark_box, lettering, lettering_box, height: int) -> Image.Image:
+    """Logotype horizontal, symbole de `height` px de haut, recadré au plus juste."""
+    mw, mh = mark_box[2] - mark_box[0], mark_box[3] - mark_box[1]
+    lw, lh = lettering_box[2] - lettering_box[0], lettering_box[3] - lettering_box[1]
+    k_mark = height / mh
+    k_name = LOCKUP_NAME_RATIO * height / lh
+    name_x = mw * k_mark + LOCKUP_GAP_X * HEAD_RATIO * height
+    size = (int(np.ceil(name_x + lw * k_name)), height)
+    out = resample(mark, mark_box, k_mark, 0, 0, size)
+    out += resample(lettering, lettering_box, k_name, name_x, (height - lh * k_name) / 2, size)
+    return to_palette(out)
+
+
 def save_detoured(matte: np.ndarray, path: Path, margin: int = 4) -> None:
     """Logo sur fond transparent, recadré sur sa boîte englobante (+ marge)."""
     x0, y0, x1, y1 = bbox(matte[..., 3])
@@ -150,7 +223,28 @@ def main() -> None:
     # Logos détourés à la résolution source (supports, docs, site vitrine).
     save_detoured(matte, ROOT / 'public/brand/logo-mark.png')
     wordmark_rgb = np.asarray(Image.open(WORDMARK_SOURCE).convert('RGB')).astype(float)
-    save_detoured(unmix(wordmark_rgb), ROOT / 'public/brand/logo-wordmark.png')
+    wordmark = unmix(wordmark_rgb)
+    save_detoured(wordmark, ROOT / 'public/brand/logo-wordmark.png')
+
+    # Logo complet réduit pour les écrans, recadré au plus juste.
+    wbox = bbox(wordmark[..., 3])
+    k = WORDMARK_SCREEN_WIDTH / (wbox[2] - wbox[0])
+    size = (WORDMARK_SCREEN_WIDTH, round((wbox[3] - wbox[1]) * k))
+    path = 'public/brand/logo-wordmark-480.png'
+    to_palette(resample(wordmark, wbox, k, 0, 0, size)).save(ROOT / path, optimize=True)
+    print(f'{path} : {size[0]}×{size[1]}')
+
+    # Logotype horizontal : en-tête de l'app (public/logo.png) et version haute
+    # définition, à la résolution d'origine du lettrage (jamais agrandi).
+    _, lettering, lbox = split_wordmark(wordmark)
+    native = round((lbox[3] - lbox[1]) / LOCKUP_NAME_RATIO)
+    for path, height in (
+        ('public/logo.png', HEADER_LOGO_HEIGHT),
+        ('public/brand/logo-horizontal.png', native),
+    ):
+        image = render_lockup(matte, box, lettering, lbox, height)
+        image.save(ROOT / path, optimize=True)
+        print(f'{path} : {image.width}×{image.height}, transparent')
 
     # Maskable : tout pixel du logo dans un cercle de 34 % de rayon, avec de
     # la marge dans la zone sûre (cercle central de 80 % de diamètre, soit
@@ -182,14 +276,6 @@ def main() -> None:
         append_images=favicons[:-1],
     )
     print('app/favicon.ico : 16, 32, 48 px')
-
-    # Logotype de l'en-tête : même dessin, orange du logo.
-    wordmark_path = ROOT / 'public/logo.png'
-    wordmark = np.asarray(Image.open(wordmark_path).convert('RGBA')).copy()
-    wordmark[..., :3] = ORANGE
-    wordmark[wordmark[..., 3] == 0, :3] = 0
-    Image.fromarray(wordmark, 'RGBA').save(wordmark_path, optimize=True)
-    print('public/logo.png : recoloré en #%02X%02X%02X' % ORANGE)
 
 
 if __name__ == '__main__':

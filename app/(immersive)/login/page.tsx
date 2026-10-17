@@ -79,13 +79,28 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="flex h-14 items-center px-6">
+      {/* Logo complet : au moins 120 px de large et une zone de protection d'au
+          moins x (diamètre d'une tête, ≈ 16 px ici) tout autour. Écrans bas
+          (iPhone SE dans Safari) : taille minimale, pour garder le bouton
+          Strava visible sans défiler. */}
+      <div className="flex justify-center pb-4 pt-5 [@media(max-height:600px)]:pb-3.5 [@media(max-height:600px)]:pt-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="PerfConnect" width={102} height={28} className="h-7 w-auto" />
+        <img
+          src="/brand/logo-wordmark-480.png"
+          alt="PerfConnect"
+          width={136}
+          height={86}
+          className="h-auto w-[136px] [@media(max-height:600px)]:w-[120px]"
+        />
       </div>
 
-      <div className="relative min-h-[180px] flex-1 overflow-hidden px-2 [max-height:40dvh]">
-        <WelcomeHero />
+      {/* Illustration : hauteur naturelle (5:4) bornée entre 180 px et 40 % de
+          l'écran ; l'image remplit la zone et est recadrée au centre, pour que
+          les pastilles restent visibles sur les petits écrans. */}
+      <div className="relative aspect-[5/4] min-h-[180px] flex-1 overflow-hidden [max-height:40dvh]">
+        <div className="absolute inset-x-2 inset-y-0">
+          <WelcomeHero />
+        </div>
       </div>
 
       <div className="px-6 pb-4">

@@ -25,10 +25,13 @@
       main {
         max-width: 320px;
       }
+      /* Logo complet : jamais moins de 120 px de large, zone de protection
+         ≥ x (diamètre d'une tête, ≈ 19 px à cette taille). */
       img {
-        height: 28px;
-        width: auto;
-        margin-bottom: 32px;
+        display: block;
+        width: 160px;
+        height: auto;
+        margin: 0 auto 32px;
       }
       h1 {
         font-size: 20px;
@@ -56,7 +59,7 @@
   </head>
   <body>
     <main>
-      <img src="/logo.png" alt="PerfConnect" />
+      <img src="/brand/logo-wordmark-480.png" alt="PerfConnect" width="160" height="101" />
       <h1>Pas de connexion internet</h1>
       <p>Vérifie ton réseau puis réessaie. Tes sorties et tes messages s'afficheront dès que tu seras de nouveau en ligne.</p>
       <button type="button" onclick="location.reload()">Réessayer</button>

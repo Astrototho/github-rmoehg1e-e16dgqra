@@ -41,9 +41,18 @@ export default async function MainLayout({
       {/* --- Barre supérieure --- */}
       <header className="sticky top-0 z-50 border-b bg-white/90 backdrop-blur-md pt-safe">
         <div className="flex h-14 items-center justify-between px-4">
-          <Link href="/" className="flex items-center" aria-label="Accueil PerfConnect">
+          {/* Logotype horizontal (docs/charte-graphique.md §1) : 186 px de large,
+              réduit sans déformation sur les téléphones de 320 px (24 px de
+              haut au minimum). */}
+          <Link href="/" className="flex min-w-0 items-center" aria-label="Accueil PerfConnect">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="PerfConnect" className="h-7 w-auto" />
+            <img
+              src="/logo.png"
+              alt="PerfConnect"
+              width={186}
+              height={28}
+              className="h-7 w-auto max-w-full object-contain object-left"
+            />
           </Link>
 
           <div className="flex items-center gap-1">
