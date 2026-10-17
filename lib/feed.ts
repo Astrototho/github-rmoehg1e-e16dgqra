@@ -7,6 +7,20 @@ import { getUsersByIds } from '@/lib/users';
 import type { Activity, AppUser } from '@/lib/types';
 
 /**
+ * Pourquoi une sortie n'a pas de % : 'viewer' = le visiteur n'a pas de profil
+ * pour ce sport (on peut le lui dire, ce sont ses données) ; 'organizer' =
+ * profil de l'organisateur absent (jamais détaillé : données d'autrui).
+ */
+export type MatchUnavailableReason = 'viewer' | 'organizer';
+
+export interface FeedMatches {
+  matches: Record<string, MatchResult>;
+  unavailable: Record<string, MatchUnavailableReason>;
+}
+
+type MatchableActivity = Pick<Activity, 'id' | 'organizer_id' | 'type' | 'distance' | 'elevation'>;
+
+/**
  * % de match entre le visiteur et l'organisateur de chaque sortie (rythme et
  * style des deux personnes, puis faisabilité de la sortie pour le visiteur).
  * Les profils manquants ou périmés des organisateurs sont recalculés en tâche
@@ -14,9 +28,17 @@ import type { Activity, AppUser } from '@/lib/types';
  */
 export async function getMatchPercentages(
   viewer: AppUser | null,
-  activities: Pick<Activity, 'id' | 'organizer_id' | 'type' | 'distance' | 'elevation'>[]
+  activities: MatchableActivity[]
 ): Promise<Record<string, MatchResult>> {
-  if (!viewer || activities.length === 0) return {};
+  return (await getFeedMatches(viewer, activities)).matches;
+}
+
+/** Comme getMatchPercentages, avec la raison de chaque % manquant. */
+export async function getFeedMatches(
+  viewer: AppUser | null,
+  activities: MatchableActivity[]
+): Promise<FeedMatches> {
+  if (!viewer || activities.length === 0) return { matches: {}, unavailable: {} };
 
   try {
     const organizerIds = Array.from(new Set(activities.map((a) => a.organizer_id)));
@@ -38,26 +60,29 @@ export async function getMatchPercentages(
       (profilesByUser[viewer.id] ?? []).map((p) => [p.sportFamily, p])
     );
 
-    const map: Record<string, MatchResult> = {};
+    const matches: Record<string, MatchResult> = {};
+    const unavailable: Record<string, MatchUnavailableReason> = {};
     for (const act of activities) {
       if (act.organizer_id === viewer.id || !isActivityType(act.type)) continue;
 
       const organizerFamilies = new Map(
         (profilesByUser[act.organizer_id] ?? []).map((p) => [p.sportFamily, p])
       );
+      const viewerProfile = viewerFamilies.get(act.type);
       const result = computeMatch(
-        viewerFamilies.get(act.type),
+        viewerProfile,
         organizerFamilies.get(act.type),
         viewerGeo,
         geoMap.get(act.organizer_id) ?? {},
         { type: act.type, distanceKm: Number(act.distance), elevationM: Number(act.elevation) }
       );
-      if (result) map[act.id] = result;
+      if (result) matches[act.id] = result;
+      else unavailable[act.id] = viewerProfile ? 'organizer' : 'viewer';
     }
-    return map;
+    return { matches, unavailable };
   } catch (err) {
     console.error('Erreur getMatchPercentages:', err);
-    return {};
+    return { matches: {}, unavailable: {} };
   }
 }
 

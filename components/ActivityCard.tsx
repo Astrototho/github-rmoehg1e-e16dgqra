@@ -15,6 +15,8 @@ export interface ActivityCardData extends Activity {
   matchPercentage?: number;
   /** Explication courte affichée sous le % (jamais de donnée Strava d'autrui). */
   matchHint?: string;
+  /** Fil connecté sans % : profil du visiteur ou de l'organisateur absent. */
+  matchUnavailable?: 'viewer' | 'organizer';
   distanceFromViewerKm?: number;
   participantsCount?: number;
   participantAvatars?: string[];
@@ -174,10 +176,11 @@ export default function ActivityCard({ activity, href, badge, anonymous }: Activ
               match
             </span>
           </div>
-        ) : anonymous ? (
+        ) : anonymous || activity.matchUnavailable ? (
           <div className="absolute right-3 top-3 flex flex-col items-center rounded-2xl bg-white/95 px-3 py-2 text-gray-500 shadow-lg">
             <span className="flex items-center gap-1 text-2xl font-black leading-none">
-              ?? %<Lock className="h-3.5 w-3.5" aria-hidden="true" />
+              {anonymous ? '??' : '–'} %
+              {anonymous && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
             </span>
             <span className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.12em]">match</span>
           </div>
@@ -197,9 +200,11 @@ export default function ActivityCard({ activity, href, badge, anonymous }: Activ
               <p className="truncate text-xs text-gray-600">
                 {anonymous
                   ? 'Connecte-toi pour voir ton match'
-                  : activity.matchPercentage == null
-                    ? 'Match indisponible pour ce sport'
-                    : 'Organisateur'}
+                  : activity.matchUnavailable === 'viewer'
+                    ? 'Trop peu de sorties sur ton Strava'
+                    : activity.matchUnavailable === 'organizer'
+                      ? 'Match pas encore calculé'
+                      : 'Organisateur'}
               </p>
             </div>
           </div>

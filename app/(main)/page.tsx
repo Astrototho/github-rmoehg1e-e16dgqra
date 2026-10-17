@@ -12,7 +12,7 @@ import {
 } from '@/lib/participations';
 import {
   getDistancesFromViewer,
-  getMatchPercentages,
+  getFeedMatches,
   parsePositionCookie,
   sortFeed,
 } from '@/lib/feed';
@@ -62,9 +62,9 @@ export default async function Home({ searchParams }: HomeProps) {
   const filters = parseFeedFilters(params);
   const visible = applyFeedFilters(activities, filters, distanceMap);
   const ids = visible.map((a) => a.id);
-  const [participantsMap, matchMap, statuses] = await Promise.all([
+  const [participantsMap, { matches: matchMap, unavailable }, statuses] = await Promise.all([
     getApprovedParticipantsForActivities(ids),
-    getMatchPercentages(currentUser, visible),
+    getFeedMatches(currentUser, visible),
     currentUser
       ? getViewerParticipationStatuses(currentUser.id, ids)
       : ({} as Record<string, 'pending' | 'approved'>),
@@ -111,6 +111,7 @@ export default async function Home({ searchParams }: HomeProps) {
                 participantAvatars: participants.map((p) => p.user_avatar),
                 matchPercentage: matchMap[act.id]?.percentage,
                 matchHint: matchMap[act.id]?.hint,
+                matchUnavailable: unavailable[act.id],
                 distanceFromViewerKm: distanceMap[act.id],
                 viewerStatus: statuses[act.id] ?? null,
               }}
